@@ -47,9 +47,10 @@ export, AWS client or vector backend is wired into the portfolio runtime.
 
 Runtime Controller is the first project entry. Its standalone article documents
 the sibling visual-agent-builder implementation using source excerpts and labeled
-illustrative payloads. It uses shared reading CSS and article-only placeholder
-styles, with no new runtime dependency or content-loader permissions. The opening
-video block is a non-interactive placeholder until a recording is supplied.
+illustrative payloads. It uses shared reading CSS and an opening native HTML video player. The bundled
+MP4 is a 1280-pixel-wide export of the supplied screen recording, with metadata preload and
+user-initiated playback. The reader CSP permits only that exact media URL; script,
+network API, nested-frame and sandbox restrictions remain in place.
 
 The portfolio is light-only: the shell no longer reads theme localStorage or
 exposes a theme switch. ContentService always marks its isolated document light

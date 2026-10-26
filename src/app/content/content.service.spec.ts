@@ -72,6 +72,9 @@ describe('ContentService', () => {
     service.load(item).subscribe(value => {
       const text = TestBed.inject(DomSanitizer).sanitize(SecurityContext.HTML, value)!;
       expect(text).toContain("script-src 'none'");
+      expect(text).toContain(`media-src ${new URL('projects/assets/visual-agent-builder/runtime-controller-demo.mp4', document.baseURI).href};`);
+      expect(text).toContain("frame-src 'none'");
+      expect(text).toContain("connect-src 'none'");
       expect(text).toContain("form-action 'none'");
       expect(text).toContain('<base href="');
       expect(text).toContain('<html lang="en" data-portfolio-theme="light">');

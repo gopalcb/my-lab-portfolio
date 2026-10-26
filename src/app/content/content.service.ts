@@ -84,7 +84,9 @@ export class ContentService {
     // User-clicked source links may open separate tabs; parent navigation stays blocked.
     // The first CSP/base precede fetched markup; subsequent policies cannot relax it.
     const origins = [...new Set([url.origin, new URL(this.document.baseURI).origin])].join(' ');
-    const policy = `default-src 'none'; script-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; img-src data: ${origins}; style-src 'unsafe-inline' ${origins}; font-src 'none'; base-uri ${url.origin}`;
+    // Only the bundled demo may load media; remote content origins are not media sources.
+    const demoUrl = new URL('projects/assets/visual-agent-builder/runtime-controller-demo.mp4', this.document.baseURI).href;
+    const policy = `default-src 'none'; script-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; media-src ${demoUrl}; form-action 'none'; img-src data: ${origins}; style-src 'unsafe-inline' ${origins}; font-src 'none'; base-uri ${url.origin}`;
     const lightStylesUrl = new URL('read/light.css', this.document.baseURI).href;
     const readerStyles = `<link rel="stylesheet" href="${escape(lightStylesUrl)}">`;
     const head = `<head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escape(policy)}"><base href="${escape(url.href)}"><meta name="viewport" content="width=device-width, initial-scale=1">${readerStyles}`;

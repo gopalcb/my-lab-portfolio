@@ -55,3 +55,6 @@ Thumbs.db
 /.env
 /.env.*
 !.env.example
+
+# Preserve original screen recordings locally; publish only optimized demo assets.
+/Screen Recording *.mov

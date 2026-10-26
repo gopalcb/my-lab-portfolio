@@ -134,14 +134,16 @@ The first My works item is [Runtime Controller](public/projects/visual-agent-bui
 served at `/#/projects/visual-agent-builder`. Its source-reviewed walkthrough covers
 visual capture, Codex dispatch, state, results, logging, usage and recovery in the
 sibling `visual-agent-builder` project. `visual-agent-builder.css` adds only the
-article-specific video placeholder and Mermaid figure. Shared light reader styles
+article-specific video player and Mermaid figure. Shared light reader styles
 apply both in the portfolio and when the article is opened directly.
 
-To add the recording later, replace the marked demo section. The current placeholder
-does not load media or pretend to play. The reader currently blocks media and nested
-frames through CSP: a hosted video can be linked in an independent tab, while an
-inline local video needs a narrowly scoped media policy change and playback tests.
-Do not add a player iframe or relax script/same-origin sandbox permissions.
+The demo uses a native HTML video player with controls, inline mobile playback and
+metadata-only preload. `public/projects/assets/visual-agent-builder/runtime-controller-demo.mp4`
+is a web export of the supplied October 26 recording. The original MOV stays local.
+The reader CSP permits only this bundled media URL; scripts, nested frames,
+network APIs and same-origin sandbox permissions remain disabled. To replace the
+video, export a compatible MP4 at the same path and verify playback and seeking
+inside the sandboxed article before publishing.
 
 The Runtime Controller flow is authored in
 `public/projects/assets/visual-agent-builder/request-to-result.mmd` and rendered
