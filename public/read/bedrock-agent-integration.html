@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bedrock agent integration</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / BEDROCK AGENT INTEGRATION</h1>
+<p class="lede">A proposed InvokeAgent adapter with explicit destination approval, durable attempt mapping, bounded responses and honest handling of uncertain remote effects.</p></header>
+<aside class="notice"><strong>PROPOSED ADAPTER · NO CLOUD EXECUTION</strong><p>The local codex-multi-agent plugin implements collaboration and supervised Codex workers. The aws-bedrock-agent-caller directory is empty. Bedrock integration remains a design proposal; this static document makes no service connection and supplies no deployed agent IDs.</p></aside>
+<section><h2>Extend execution behind a narrow boundary</h2>
+<p>The proposed adapter would let the coordinator send one approved task to an existing Amazon Bedrock Agent and review its bounded result. It would use Bedrock Agents <code>InvokeAgent</code>, rather than AgentCore Runtime’s separate API. A common task contract could support native, CLI and remote execution while preserving their different failure models.</p>
+<p>The existing dispatcher accepts only local <code>launch_agent</code> payloads containing prompt, workspace and mode. It has no Bedrock execution branch. Adding remote work therefore needs a reviewed contract and implementation, not a new mode string slipped into an existing launch request. The portfolio viewer remains a static reader; credentials and invocation belong in an authorized backend or local adapter.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="bedrock-agent-integration-boundary-title">
+<p class="diagram-title" id="bedrock-agent-integration-boundary-title">Proposed remote execution boundary</p>
+<section class="diagram-group"><h3 class="diagram-label">Local control</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Coordinator</strong><span>Approve task scope and data</span>
+</li>
+<li class="diagram-node">
+<strong>Adapter gate</strong><span>Validate destination and outbound envelope</span>
+</li>
+<li class="diagram-node">
+<strong>Attempt receipt</strong><span>Persist mapping before network send</span>
+</li>
+</ol></section>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Remote execution and return</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Bedrock Agent alias</strong><span>InvokeAgent in selected account / region</span>
+</li>
+<li class="diagram-node">
+<strong>Bounded event consumer</strong><span>Classify text, actions and errors</span>
+</li>
+<li class="diagram-node">
+<strong>Coordinator review</strong><span>Accept evidence before integration</span>
+</li>
+</ol></section>
+<p class="diagram-note">All adapter components here are proposed. The existing local inbox can inform the design but does not already implement this remote path.</p>
+</div>
+<figcaption>Proposed remote execution boundary.</figcaption></figure></section><section><h2>Resolve identity and data before sending</h2>
+<p>Require an explicit expected account, named credential profile and region. Resolve credentials through approved local mechanisms; never put keys in assignments. An authorized run would verify caller identity before invocation. Identity verification establishes who is calling, while IAM and approved task scope determine what may be done.</p>
+<p>Allowlist the exact agent ID and alias ID together with their account and region. Reject a mismatch instead of falling back to defaults or discovering another target. Alias routing can change, so record the reviewed destination and available version evidence per attempt. AWS scopes <code>bedrock:InvokeAgent</code> permission to an agent-alias resource; invocation rights need not grant agent creation or editing. <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/security_iam_id-based-policy-examples-agent.html" target="_blank" rel="noopener noreferrer">AWS’s IAM examples describe that resource boundary.</a></p>
+<figure><div class="system-diagram" role="group" aria-labelledby="bedrock-agent-integration-gates-title">
+<p class="diagram-title" id="bedrock-agent-integration-gates-title">Every outbound task passes explicit gates</p>
+<section class="diagram-group"><h3 class="diagram-label">Preflight</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Expected identity</strong><span>Account + profile + region</span>
+</li>
+<li class="diagram-node">
+<strong>Approved destination</strong><span>Allowlisted agent and alias</span>
+</li>
+<li class="diagram-node">
+<strong>Approved data</strong><span>Minimal redacted task envelope</span>
+</li>
+</ol></section>
+<p class="diagram-note">Missing identity, destination approval or data scope blocks invocation. Installation of the local plugin supplies none of these cloud permissions.</p>
+</div>
+<figcaption>Every outbound task passes explicit gates.</figcaption></figure><p>Send only the problem statement, relevant approved excerpts, constraints and result schema. Exclude repository-wide context, credentials, native session histories and unrelated personal data. Enforce byte limits before serialization, cap requested work and set deadlines and cost/concurrency budgets. These proposed controls must be executable validation rules, with clear errors and tests, rather than instructions that the remote model may ignore.</p></section>
+<section><h2>Map local attempts to remote conversation state</h2>
+<p>Keep separate identifiers for the local task, local attempt and remote <code>sessionId</code>. Persist their association with destination, request digest and dispatch state before sending. Each independent task gets isolated conversation state. A deliberate continuation reuses its mapped session; a fresh attempt must explicitly decide whether prior context is intended. AWS documents that the same session ID continues a conversation. <a href="https://docs.aws.amazon.com/bedrock/latest/APIReference/API_agent-runtime_InvokeAgent.html" target="_blank" rel="noopener noreferrer">The InvokeAgent contract also defines endSession and response event types.</a></p>
+<figure><div class="system-diagram" role="group" aria-labelledby="bedrock-agent-integration-mapping-title">
+<p class="diagram-title" id="bedrock-agent-integration-mapping-title">A durable receipt links two systems</p>
+<section class="diagram-group"><h3 class="diagram-label">Local ledger</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Task identity</strong><span>Owner, scope and acceptance criteria</span>
+</li>
+<li class="diagram-node">
+<strong>Attempt identity</strong><span>Digest, destination and send state</span>
+</li>
+<li class="diagram-node">
+<strong>Remote session mapping</strong><span>Stable for intentional continuation</span>
+</li>
+</ol></section>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Return path</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Response observation</strong><span>Request metadata + bounded events</span>
+</li>
+<li class="diagram-node">
+<strong>Normalized result</strong><span>Outcome, evidence and limitations</span>
+</li>
+<li class="diagram-node">
+<strong>Local completion</strong><span>Only after coordinator validation</span>
+</li>
+</ol></section>
+<p class="diagram-note">Proposed receipt fields are not current plugin tables. A remote session ID supplies conversation continuity, not an exactly-once guarantee.</p>
+</div>
+<figcaption>A durable receipt links two systems.</figcaption></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable code example">
+<pre data-language="TEXT"><code>Proposed receipt, not current API payload:
+local_task_id → local_attempt_id → remote_session_id
+destination: expected_account / region / agent_id / alias_id
+request_digest + send_state + observed_outcome
+bounded_result + evidence + unresolved_effects</code></pre>
+</div>
+<p>The consumer should treat the response as typed events, not assume one plain text body. Decode chunk bytes incrementally and preserve attribution separately. Apply limits to total bytes, event count and duration; classify trace, files, return-control requests and errors explicitly. Reject unsupported events safely. A partial answer or initial HTTP success cannot establish a complete result. Keep trace collection disabled by default and sanitize any approved diagnostics.</p>
+<p>AWS supports optional final-response streaming, and documents additional streaming permission requirements. The adapter must handle both a single final chunk and streamed chunks without changing its result contract. <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/agents-invoke-agent.html" target="_blank" rel="noopener noreferrer">The application invocation guide explains response streaming.</a> Limits and stream interruption behavior still need implementation and focused tests.</p></section>
+<section><h2>Separate remote capability from local approval</h2>
+<p>Remote action groups can invoke Lambda functions or return requested actions to the caller. Their permissions and downstream effects are separate from the local coordinator’s file ownership rules. Review the agent service role, Lambda permissions and connected resources before any live task; invocation can cause effects beyond producing text. <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/agents-action-create.html" target="_blank" rel="noopener noreferrer">AWS describes these action-group execution choices.</a></p>
+<p>For caller-side execution, treat <code>returnControl</code> as a proposed action requiring validation and authorization. Do not execute arbitrary returned commands. If an action is permitted and completed, its result must be associated with the returned invocation ID in the continuing session. <a href="https://docs.aws.amazon.com/bedrock/latest/userguide/agents-returncontrol.html" target="_blank" rel="noopener noreferrer">AWS documents the return-control handoff.</a> A text-only initial integration could reject action requests and report that limitation.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="bedrock-agent-integration-outcome-title">
+<p class="diagram-title" id="bedrock-agent-integration-outcome-title">Unknown outcome requires reconciliation</p>
+<section class="diagram-group"><h3 class="diagram-label">Observed outcomes</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Complete response</strong><span>Validate schema, provenance and limits</span>
+</li>
+<li class="diagram-node">
+<strong>Known rejection</strong><span>Report bounded failure; correct cause</span>
+</li>
+<li class="diagram-node">
+<strong>Disconnected or timed out</strong><span>Remote effects may already have occurred</span>
+</li>
+</ul></section>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Recovery</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Inspect receipt and effects</strong><span>Do not infer cancellation from disconnect</span>
+</li>
+<li class="diagram-node">
+<strong>Decide retry policy</strong><span>Bounded backoff only when safe</span>
+</li>
+<li class="diagram-node">
+<strong>Coordinator decision</strong><span>Accept, investigate or explicitly retry</span>
+</li>
+</ol></section>
+<p class="diagram-note">These are alternative outcomes followed by recovery. Local deduplication does not make a remote action idempotent; action handlers need their own durable keys.</p>
+</div>
+<figcaption>Unknown outcome requires reconciliation.</figcaption></figure><p>Record uncertainty when a connection fails after sending. Configure SDK retries deliberately and account for them in the attempt budget; a new session can still repeat a business effect. The API has no general client request token that turns this workflow into exactly-once execution. Require action-level idempotency and reconciliation before retrying effectful work. Ending a conversation is not a rollback of completed actions.</p>
+<p>Before declaring the adapter ready, implement offline request validation, event fixtures, interruption and duplicate-attempt cases, then separately obtain authorization for a tightly scoped dev invocation. The coordinator must compare the returned evidence with the original acceptance criteria and report unresolved effects. This note verifies the proposal’s source boundary and AWS contract, while adapter behavior, IAM configuration and live execution remain unverified.</p></section>
+<footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

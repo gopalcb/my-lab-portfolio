@@ -1,0 +1,28 @@
+sequenceDiagram
+    participant B as Browser
+    participant A as Public ALB
+    participant E as ECS edge API
+    participant R as Redis
+    participant K as Private EKS user API
+    participant D as Relational database
+    participant Q as SQS analytics queue
+    participant W as Analytics worker
+    B->>A: Profile read or update + traceparent
+    A->>E: Route API request
+    E->>R: Read scoped cache key
+    alt Cache hit
+        R-->>E: Current representation
+        E-->>B: Fast response + request ID
+    else Miss or write
+        R-->>E: Miss or bounded timeout
+        E->>K: Private domain request
+        K->>D: Reader or writer operation
+        D-->>K: Domain result
+        K-->>E: Authorized result
+        E->>R: Best-effort TTL fill
+        E-->>B: Response + request ID
+    end
+    E->>Q: Commit job event after business write
+    Q->>W: Deliver event
+    W-->>B: Job status becomes complete
+    Note over E,W: Trace context linked, job identity remains job_id

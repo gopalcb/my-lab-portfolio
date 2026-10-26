@@ -1,0 +1,13 @@
+flowchart LR
+    Need[Agent needs an action] --> Select[Select tool + inputs]
+    Select --> Boundary{Tool boundary?}
+    Boundary -->|Native| Native[Native tools]
+    Boundary -->|Workspace utility| Utility[Workspace utility]
+    Boundary -->|Opt-in collaboration| Agent[Scoped agent]
+    Boundary -->|Planned adapter| Bedrock[Bedrock adapter]
+    Native --> Result[Read the result]
+    Utility --> Result
+    Agent --> Result
+    Bedrock --> Result
+    Result --> Validate[Validate the actual outcome]
+    Validate --> Need

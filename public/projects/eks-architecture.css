@@ -1,0 +1,25 @@
+/* AWS-style boundaries, scoped to the EventHub project document. */
+.aws-landscape{background:#111a1e;border:1px solid #40514e;border-radius:4px;padding:16px;overflow-wrap:anywhere}
+.aws-landscape .diagram-title{margin:0 0 14px;font-size:11px}
+.arch-legend{display:flex;flex-wrap:wrap;gap:8px 18px;font-size:10px;color:#a5b4ba;margin-bottom:16px}.arch-legend b{font-weight:400;color:#9de8cc}
+.arch-boundary{position:relative;border:1px solid #40514e;border-radius:4px;padding:12px;margin-top:12px}
+.boundary-label{display:block;font:9px/1.8 ui-monospace,monospace;letter-spacing:.06em;color:#a5b4ba;margin:0 0 10px;text-transform:uppercase}
+.arch-region{border-color:#9e805b}.arch-vpc{border-color:#688275}.arch-public{border-style:dashed}.managed-control{border-style:dashed;background:#151f23;margin:0 0 16px}
+.arch-service{min-width:0;border:1px solid #40514e;border-radius:4px;background:#151f23;padding:10px}
+.service-badge{display:block;color:#dbad74;font:9px/1.7 ui-monospace,monospace;letter-spacing:.04em;margin-bottom:6px}
+.arch-service strong,.arch-node>strong{display:block;font:400 11px/1.8 ui-monospace,monospace;color:#dce7e1;overflow-wrap:anywhere}
+.aws-landscape p,.arch-service p{font-size:11px;line-height:1.8;margin:8px 0 0;max-width:none}.aws-landscape code{font-size:10px}
+.external-entry,.arch-public-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.dns-lookup{font-size:10px;color:#a5b4ba}.dns-lookup .arch-service{margin-top:6px}
+.path-connector{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px;font:10px/1.8 ui-monospace,monospace;color:#9de8cc;margin:12px 2px}
+.arch-cluster-label{font:10px/1.8 ui-monospace,monospace;letter-spacing:.04em;color:#9de8cc;margin:14px 0 10px}
+.arch-az-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.arch-az{min-width:0;border:1px dashed #50616a;border-radius:4px;padding:8px}.arch-az>h3{font-size:9px;margin:0 0 8px}
+.arch-subnet{border:1px solid #40514e;border-radius:4px;padding:7px;background:#121e22}.arch-subnet>.boundary-label{font-size:8.5px}
+.arch-node{border:1px solid #6b604e;border-radius:4px;padding:8px;background:#182124;margin-top:10px}.arch-node .service-badge{font-size:8.5px}.node-runtime{color:#a5b4ba;font-size:10px!important}
+.arch-pod{border:1px solid #4f6c61;border-radius:4px;background:#14211f;padding:7px;margin-top:9px;min-width:0}.arch-pod>.boundary-label{font-size:8.5px;color:#9de8cc;margin-bottom:4px}.arch-pod>strong{display:block;font:400 10px/1.7 ui-monospace,monospace;color:#dce7e1}.arch-pod small{display:block;font-size:9px;line-height:1.7;color:#a5b4ba;margin:4px 0}
+.arch-container{border:1px solid #45594f;border-radius:4px;padding:6px;background:#182725}.arch-container>span{font:9px/1.6 ui-monospace,monospace;color:#c2d2cb}.arch-container p{font-size:10px;margin-top:5px}
+.arch-route-strip,.arch-control-link{padding:10px;border:1px dashed #50616a;border-radius:4px;font-size:10px!important;color:#b9cac3}.arch-route-strip{margin:12px 0!important}.arch-control-link{margin-top:12px;font:10px/1.8 ui-monospace,monospace}
+.arch-support-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.arch-regional-services{margin-top:16px}.arch-regional-services>.boundary-label{color:#dbad74}.arch-small{font-size:10px!important;color:#a5b4ba}
+.architecture-landscape figcaption{margin-top:10px}
+@media(max-width:900px){.arch-az-grid{grid-template-columns:1fr}.arch-support-grid{grid-template-columns:1fr}.arch-node{padding:10px}.arch-pod>strong{font-size:11px}.arch-subnet>.boundary-label{font-size:9px}}
+@media(max-width:650px){.aws-landscape{padding:12px}.arch-boundary{padding:9px}.external-entry,.arch-public-grid{grid-template-columns:1fr}.path-connector{flex-direction:column}.arch-legend{gap:7px 12px}.arch-container p{font-size:11px}}

@@ -1,0 +1,8 @@
+flowchart LR
+    Prompt[User prompt] --> Route[Scope + risk]
+    Route --> Context[Relevant instructions, skills, and code]
+    Context --> Structure{Simple or complex?}
+    Structure -->|Simple| Direct[Answer or edit]
+    Structure -->|Complex| Plan[Reviewable plan]
+    Direct --> Check[Check the result]
+    Plan --> Check

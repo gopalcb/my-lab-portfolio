@@ -1,0 +1,18 @@
+flowchart TD
+    Browser[Browser] --> APIGW[API Gateway]
+    APIGW --> Lambda[Lambda handlers]
+    Lambda --> DDB[DynamoDB transaction]
+    DDB --> Stream[DynamoDB Streams]
+    Stream --> Relay[Outbox relay]
+    Relay --> SQS[SQS with partial batch response]
+    SQS --> Function[Idempotent analytics Lambda]
+    Function --> Aggregate[Aggregate and job status]
+    Lambda -. OTLP or layer .-> Gateway[Collector gateway]
+    Function -. OTLP or layer .-> Gateway
+    Lambda -. JSON stdout .-> CW[CloudWatch Logs]
+    CW -. forwarding .-> Loki[Loki]
+    Gateway --> Tempo[Tempo]
+    Gateway --> Mimir[Metrics backend]
+    Tempo --> Grafana[Grafana]
+    Mimir --> Grafana
+    Loki --> Grafana

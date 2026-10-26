@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Trace the proposed EventHub packet paths through AWS, Linux, Kubernetes Services, the NGINX edge and the later mesh trust boundary.">
+<title>Kubernetes networking</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / KUBERNETES NETWORKING</h1>
+<p class="lede">Trace the proposed EventHub packet paths through AWS, Linux, Kubernetes Services, the NGINX edge and the later mesh trust boundary.</p></header><aside class="notice"><strong>PLANNED LAB · DOCUMENTATION ONLY</strong><p>The repository contains plans and drill guides. Application code, Terraform, CI and deployed EKS resources are not built yet. Diagrams show the target; commands and outcomes are examples, not recorded results.</p></aside><section id="map"><h2>Start with the networks, not the YAML</h2>
+<p class="resource-context">Every path here belongs to EventHub: monitoring-agent-service, registration replicas, NGINX data-plane pods, private RDS and the audit bucket.</p>
+<p>The target lab uses IPv4 VPC-native pod networking: AWS VPC CNI, CoreDNS, kube-proxy, an explicitly enabled policy engine, AWS Load Balancer Controller, NLB, NGINX Gateway Fabric and cert-manager. Istio is introduced later. ALB, IPv6 and Cilium/eBPF are comparisons or extensions, not simultaneous baseline components. No network described here has been provisioned.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="kubernetes-networking-vpc-route-tiers-title">
+<p class="diagram-title" id="kubernetes-networking-vpc-route-tiers-title">EventHub’s VPC routes</p>
+<section class="diagram-group"><h3 class="diagram-label">Candidate VPC 10.60.0.0/16 · separate tiers</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Public tier</strong><span>NLB entry + same-AZ NAT; default route to IGW</span>
+</li>
+<li class="diagram-node">
+<strong>Private workload tier</strong><span>NGINX and EventHub pods; no public node IPs</span>
+</li>
+<li class="diagram-node">
+<strong>Isolated data tier</strong><span>RDS PostgreSQL; local route, no Internet default</span>
+</li>
+</ul></section><div class="diagram-divider" aria-hidden="true"></div>
+<section class="diagram-group"><h3 class="diagram-label">Three different destinations</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>registration-service → RDS</strong><span>Local VPC route ·5432 · DB security group</span>
+</li>
+<li class="diagram-node">
+<strong>monitoring-agent → public API</strong><span>Configured node SNAT → same-AZ NAT → IGW</span>
+</li>
+<li class="diagram-node">
+<strong>audit-service → S3</strong><span>S3 gateway-endpoint route; scoped bucket policy</span>
+</li>
+</ul></section><p class="diagram-note">Workload subnets A/B/C:10.60.16.0/20,10.60.32.0/20,10.60.48.0/20. Candidate ranges need overlap review. Control ENI subnets and interface endpoints are separate private paths.</p>
+</div>
+<figcaption>EventHub target design · EventHub’s VPC routes.</figcaption></figure><p>A subnet belongs to one Availability Zone. Its associated route table chooses a next hop using the most specific matching destination. Local VPC routes enable the ordinary internal path; a public subnet has an Internet Gateway route. Private nodes have no public IPs. For their outbound Internet traffic, the reference HA profile proposes a same-AZ public NAT gateway, whose public subnet reaches the IGW. NAT is not the browser’s inbound application path. </p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Tier examples across AZ A/B/C</th>
+<th scope="col">Intended routes</th>
+<th scope="col">Why separate</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Public: 10.60.0.0/24, .1.0/24, .2.0/24</td>
+<td>Local + 0.0.0.0/0 → IGW</td>
+<td>Public NLB and NAT; public route alone does not expose a private node</td>
+</tr>
+<tr>
+<td>Workload: 10.60.16.0/20, .32.0/20, .48.0/20</td>
+<td>Local + S3 endpoint route + same-AZ NAT default</td>
+<td>Pod density, rollout headroom and outbound dependencies</td>
+</tr>
+<tr>
+<td>Data: 10.60.80.0/24, .81.0/24, .82.0/24</td>
+<td>Local; no Internet default</td>
+<td>DB access allowed only from intended clients</td>
+</tr>
+<tr>
+<td>EKS ENIs: 10.60.96.0/27, .96.32/27, .96.64/27</td>
+<td>Local/connected private access</td>
+<td>Control-plane ENI headroom separate from pod growth</td>
+</tr>
+</tbody>
+</table></div>
+<p>All CIDRs are examples. Check overlap against VPNs, peering, home networks and the selected Kubernetes Service CIDR. Enable VPC DNS support/hostnames and deliberate subnet discovery tags. Sharing a route table across subnets does not make an AZ resilient. </p></section><section id="private"><h2>Private API access and outbound dependencies</h2>
+<p class="resource-context">A connected operator bootstraps the private EventHub Kubernetes API. In-cluster Argo reconciles application changes afterward.</p>
+<p>The Kubernetes API is the administration endpoint, separate from the AWS EKS management API. A public GitHub-hosted runner cannot call a private cluster API merely because it has an IAM role. It needs a routed, permitted network path. Bootstrap from a connected environment using a reviewed VPN, connected runner or SSM-based path; steady-state application delivery can use in-cluster Argo CD pulling Git. Session Manager access to a host does not automatically make the laptop a full VPC router.</p>
+<p>Private nodes must resolve and reach the cluster endpoint to register. AL2023 node bootstrap uses nodeadm; select its configuration for the actual launch-template and managed-node arrangement rather than copying old AL2 bootstrap commands. DNS, TCP, TLS and access authorization are separate failure layers. A reachable API can still return 401 or 403.</p>
+<p>Endpoint-only egress requires an inventory: ECR API and DKR interface endpoints plus the S3 image-layer path; EKS Auth for Pod Identity; STS where used; and the selected EC2/load-balancing, Logs, Secrets Manager, SQS/SNS and SSM APIs. Interface endpoint private DNS, port 443 security groups and endpoint policies all matter. Git, Helm registries, OIDC discovery/JWKS and public ACME need their own reachable paths. Removing NAT does not supply them. AWS private-cluster requirements are a dependency checklist to recheck for the selected region and versions.</p></section><section id="cni"><h2>From an ENI to a pod’s socket</h2>
+<p class="resource-context">Use monitoring replica M1 and registration replicas R1/R2. Same-node and cross-node placements are controlled lab comparisons, not permanent scheduling guarantees.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="kubernetes-networking-vpc-cni-pod-path-title">
+<p class="diagram-title" id="kubernetes-networking-vpc-cni-pod-path-title">The same monitoring pod, two registration replicas</p>
+<section class="diagram-group"><h3 class="diagram-label">Same-node comparison · apps-node-a</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>monitoring-agent M1</strong><span>Pod namespace: eth0 + CNI-assigned VPC IP</span>
+</li>
+<li class="diagram-node">
+<strong>Host routing + veth</strong><span>Supported policy enforcement</span>
+</li>
+<li class="diagram-node">
+<strong>registration replica R1</strong><span>Same node · HTTP on 3000</span>
+</li>
+</ol></section><div class="diagram-divider" aria-hidden="true"></div>
+<section class="diagram-group"><h3 class="diagram-label">Cross-node comparison · M1 to R2</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>apps-node-a ENI</strong><span>M1 packet leaves the source worker</span>
+</li>
+<li class="diagram-node">
+<strong>VPC → apps-node-b ENI</strong><span>Routes, security rules and return path</span>
+</li>
+<li class="diagram-node">
+<strong>registration replica R2</strong><span>Destination host route/veth → HTTP on 3000</span>
+</li>
+</ol></section><p class="diagram-note">M1/R1/R2 and node aliases describe a placement fixture, not literal pod names or permanent affinity. aws-node assigns addresses; no VXLAN overlay is implied. Discover actual placement before comparing.</p>
+</div>
+<figcaption>EventHub target design · The same monitoring pod, two registration replicas.</figcaption></figure><p>The CNI sets up pod interfaces and addressing; its IPAM component manages available addresses. With the proposed AWS VPC CNI, ordinary pods receive VPC addresses allocated through node ENIs. A packet leaving a pod crosses a virtual Ethernet boundary and the host’s routing/policy path, then uses the VPC route to the destination. This differs from an overlay that wraps pod packets in an outer node-to-node packet. Do not troubleshoot a nonexistent VXLAN tunnel on this baseline. </p>
+<p>For pod→RDS, the private destination stays within the routed VPC path and must pass DB security controls. For pod→Internet, distinguish node-level CNI source translation from the NAT gateway’s public translation; actual SNAT exclusions and source preservation depend on selected configuration. For pod→an interface endpoint, private DNS should resolve the endpoint addresses and the endpoint security group must allow the call. A Linux neighbor table answers next-hop link-layer questions; it is not a replacement for route or security-policy inspection.</p></section><section id="ips"><h2>IP pressure is a rollout constraint</h2>
+<p class="resource-context">Count identity, registration, publisher, notification, audit and monitoring pods before adding platform/CNI and rollout headroom.</p>
+<ul>
+<li>Free CPU does not guarantee a pod can start: IPAM also needs a usable address.</li>
+<li>Budget for peak replicas, rolling surge, pod-IP DaemonSets, node replacements and warm CNI allocation.</li>
+<li>Count node ENI primary addresses, load balancers/endpoints and separate EKS ENI headroom.</li>
+<li>Service virtual IPs use a different range; each Service does not consume a workload-subnet pod address.</li>
+</ul>
+<p>IPv4 prefix delegation allocates /28 blocks to ENI slots; each block supplies 16 addresses, but it does not remove instance ENI limits, kubelet maxPods, subnet exhaustion or CPU/memory constraints. Aggregate free addresses are insufficient if no contiguous prefix can be allocated. Warm allocation trades address consumption for launch latency. Plan reservations or clean subnets, verify node compatibility and tune the supported settings from measurements. </p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Proposed reference-profile application replicas; not measured capacity.</span>
+identity-service                 = <span class="token number">3</span>
+registration-service             = <span class="token number">3</span>
+registration-outbox-publisher     = <span class="token number">1</span>
+notification-service             = <span class="token number">2</span>
+audit-service                    = <span class="token number">2</span>
+monitoring-agent-service         = <span class="token number">1</span>
+application baseline             = <span class="token number">12</span>
+one surge pod per Deployment     = <span class="token number">6</span>
+application rollout allowance    = <span class="token number">18</span>
+<span class="token comment"># Add actual platform pods, worker replacements, warm CNI/ENI allocations,</span>
+<span class="token comment"># endpoints and EKS ENI headroom PER subnet/AZ. This is not the subnet total.</span></code></pre></div>
+<p>If a subnet is exhausted, adding nodes to that same subnet can consume the last addresses without solving the problem. Compare secondary address allocation, prefix mode, secondary CIDRs/custom networking and later IPv6 using a documented capacity model. The lab’s F-10 and F-11 distinguish address exhaustion from prefix fragmentation.</p></section><section id="service"><h2>Service discovery, readiness and proxy rules</h2>
+<p class="resource-context">The caller is monitoring-agent-service; the destination is registration-service.apps-dev.svc.cluster.local on Service port 80 and container port 3000.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="kubernetes-networking-service-dns-endpoints-title">
+<p class="diagram-title" id="kubernetes-networking-service-dns-endpoints-title">Resolve registration, then connect</p>
+<section class="diagram-group"><h3 class="diagram-label">DNS lookup · not the HTTP packet path</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>monitoring-agent-service</strong><span>Query registration-service.apps-dev.svc.cluster.local</span>
+</li>
+<li class="diagram-node">
+<strong>coredns / kube-system</strong><span>Resolve Service DNS</span>
+</li>
+<li class="diagram-node">
+<strong>Allocated ClusterIP</strong><span>DNS reply returns the virtual Service address</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">New connection after the lookup</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>monitoring-agent-service</strong><span>Send TCP to registration ClusterIP:80</span>
+</li>
+<li class="diagram-node">
+<strong>Node forwarding rules</strong><span>Supported kube-proxy mode + conntrack</span>
+</li>
+<li class="diagram-node">
+<strong>Ready registration replica</strong><span>Endpoint IP:3000 · selected from R1/R2</span>
+</li>
+</ol></section><p class="diagram-note">Kubernetes API Service/EndpointSlice watches program kube-proxy state. EndpointSlice is metadata, not a packet proxy. An unready registration replica is excluded from normal ready endpoint selection.</p>
+</div>
+<figcaption>EventHub target design · Resolve registration, then connect.</figcaption></figure><p>For <code>registration-service.apps-dev.svc.cluster.local</code>, normal Service DNS yields its ClusterIP; the actual cluster domain must be confirmed. kube-proxy watches API state and programs the selected Linux proxy mode, such as iptables or nftables where supported. Do not assume one mode’s rule commands describe another. New flows are forwarded to eligible endpoints; conntrack can preserve an existing flow’s mapping. EndpointSlice is control-plane metadata, not a packet hop. </p>
+<p>A readiness failure normally removes a pod from normal ready-backend selection; it does not restart the process. Startup probes allow initialization time; liveness may restart a stuck process. Special publishing/termination behavior must be checked rather than assumed. A bad selector, targetPort or loopback-only application bind can defeat an otherwise healthy process. EndpointSlice conditions identify readiness and termination state.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Future approved dev context; application charts must supply these labels.</span>
+kubectl -n apps-dev get pods \
+  -l app.kubernetes.io/name=registration-service -o wide
+kubectl -n apps-dev get svc registration-service -o yaml
+kubectl -n apps-dev get endpointslices \
+  -l kubernetes.io/service-name=registration-service -o yaml
+<span class="token comment"># monitoring-agent image provides Python; no shell tools added to API images.</span>
+kubectl -n apps-dev exec deploy/monitoring-agent-service \
+  -c monitoring-agent -- python3 -c \
+  <span class="token string">'import socket; print(socket.getaddrinfo("registration-service.apps-dev.svc.cluster.local", 80))'</span>
+<span class="token comment"># Compare resolved ClusterIP, ready endpoints and actual node placement.</span></code></pre></div>
+<p>CoreDNS needs a working pod network, sufficient capacity and permitted DNS traffic. Compare short names and FQDNs, search domains and ndots, then UDP and TCP 53. A DNS timeout, NXDOMAIN and SERVFAIL suggest different hypotheses. Do not repair a resolver problem with hard-coded pod IPs. Kubernetes DNS behavior supplies the expected naming rules.</p></section><section id="edge"><h2>Browser to pod: two load-balancing boundaries</h2>
+<p class="resource-context">eventhub-public uses an internet-facing TCP 443 NLB with planned NGINX pod-IP targets; registration is a separate internal backend.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="kubernetes-networking-browser-packet-journey-title">
+<p class="diagram-title" id="kubernetes-networking-browser-packet-journey-title">From EventHub hostname to its registration transaction</p>
+<section class="diagram-group"><h3 class="diagram-label">Lookup and public connection</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Browser + Route53</strong><span>Resolve the chosen EventHub API host</span>
+</li>
+<li class="diagram-node">
+<strong>Public NLB</strong><span>Forward TCP 443 to NGINX pod IP target</span>
+</li>
+<li class="diagram-node">
+<strong>NGINX / eventhub-public</strong><span>Terminate TLS; match eventhub-registration route</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Baseline backend and data</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>registration endpoint</strong><span>apps-dev · HTTP on 3000</span>
+</li>
+<li class="diagram-node">
+<strong>registration authorization</strong><span>Verify JWT, tenant, idempotency and capacity</span>
+</li>
+<li class="diagram-node">
+<strong>RDS registration schema</strong><span>Commit registration + outbox on 5432</span>
+</li>
+</ol></section><div class="diagram-divider" aria-hidden="true"></div>
+<section class="diagram-group"><h3 class="diagram-label">Later replacement for the backend connection</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>NGINX verified backend TLS</strong><span>Private CA and hostname checks</span>
+</li>
+<li class="diagram-node">
+<strong>Private Istio gateway</strong><span>Authenticate permitted mesh principal</span>
+</li>
+<li class="diagram-node">
+<strong>registration endpoint</strong><span>Mesh mTLS; application authorization still required</span>
+</li>
+</ol></section><p class="diagram-note">The Service identifies eligible backends; pinned NGINX may select endpoint IPs directly. Do not draw an extra ClusterIP hop without observing it. Responses follow the corresponding established connections.</p>
+</div>
+<figcaption>EventHub target design · From EventHub hostname to its registration transaction.</figcaption></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">NLB target mode</th>
+<th scope="col">Packet destination</th>
+<th scope="col">What must be checked</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>IP</td>
+<td>Gateway pod IP + target port</td>
+<td>Routability, target registration/readiness, pod/node SG model and health-check path</td>
+</tr>
+<tr>
+<td>Instance</td>
+<td>Node IP + NodePort, then proxy forwarding to gateway pod</td>
+<td>NodePort rules, traffic policy, local endpoint availability and possible extra cross-node hop</td>
+</tr>
+</tbody>
+</table></div>
+<p>AWS Load Balancer Controller reconciles the NLB from the gateway’s LoadBalancer Service. Render and verify the internet-facing scheme, controller class and IP-target setting for the pinned EventHub release. Source-IP preservation, proxy protocol and <code>externalTrafficPolicy</code> interact; test the observed client address rather than copy a universal security-group rule. </p>
+<p>NLB target health and Kubernetes readiness are different signals. Check exact health-check protocol, port, path, expected response and AZ. TCP health proves a listener accepted a connection, not tenant authorization or PostgreSQL correctness. NLB can fail open when all targets are unhealthy, so health status is not an access-control boundary. </p>
+<p>The Gateway Fabric controller watches Gateway API resources and configures an NGINX data plane. GatewayClass, listener and HTTPRoute attachment must be accepted and references resolved; cross-namespace references require the applicable permission mechanism. A route’s Service reference does not guarantee that NGINX sends packets via ClusterIP: controllers can use discovered backend endpoints directly. The Service proxy journey above describes clients that actually dial the VIP. Inspect selected-controller behavior.</p>
+<p>cert-manager DNS-01 proves domain control through Route 53 and supplies the public certificate Secret to the gateway. Keep DNS permissions narrow and test renewal. NGINX terminates public TLS. The later backend TLS policy verifies the private Istio gateway; mesh STRICT mTLS plus identity authorization protects the next hop. Backend client certificates remain an optional EventHub extension behind the selected-version/OSS compatibility gate. No version-specific manifest is promised here. </p></section><section id="policy"><h2>Routes and four security controls</h2>
+<p class="resource-context">Test monitoring → registration, gateway → registration, registration → RDS, publisher → SNS, and audit → S3 as separate allowed paths.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Control</th>
+<th scope="col">Answers</th>
+<th scope="col">Frequent mistake</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Route table</td>
+<td>Where should this destination packet go next?</td>
+<td>Treating a route as a permission grant</td>
+</tr>
+<tr>
+<td>Security group</td>
+<td>May this associated interface/resource exchange this traffic? Stateful return handling</td>
+<td>Opening a node port without checking actual target mode and source</td>
+</tr>
+<tr>
+<td>Network ACL</td>
+<td>Does this ordered stateless subnet filter permit this direction?</td>
+<td>Allowing request but denying ephemeral response ports</td>
+</tr>
+<tr>
+<td>NetworkPolicy</td>
+<td>Which selected pod ingress/egress is permitted by the active engine?</td>
+<td>Creating policy objects without supported enforcement; assuming FQDN filtering</td>
+</tr>
+<tr>
+<td>TLS / mesh authorization</td>
+<td>Is the peer trusted and may its identity call this route?</td>
+<td>Accepting any valid mesh certificate as authorization</td>
+</tr>
+</tbody>
+</table></div>
+<p>The proposed baseline keeps NACLs simple and uses SGs plus enforced NetworkPolicy for intended isolation. Start application policy at default deny, then permit TCP/UDP DNS, gateway→API, API→DB/AWS dependencies and the precise telemetry and mesh control-plane paths. Standard Kubernetes NetworkPolicy operates on supported pod/namespace/IP selectors and ports; it is not a DNS-name firewall. Behavior around address translation and host traffic needs implementation-specific verification. Kubernetes NetworkPolicy semantics is the baseline contract.</p>
+<p>SGs and NACLs also have AWS-specific exceptions: they cannot be treated as a firewall for every link-local or managed service path. In particular, blocking the VPC Route 53 Resolver requires the appropriate DNS control rather than an ordinary SG/NACL deny. NACLs evaluate subnet-boundary traffic, so they do not filter two endpoints merely communicating inside the same subnet. See AWS security-group behavior and NACL evaluation and limitations.</p>
+<p>A convincing network report would compare same-node and cross-node traffic, each AZ pair, Service and direct-pod diagnostics, DNS, DB, external egress and endpoints. It must also show forbidden lateral traffic, wrong mesh identity and plaintext rejection. Packet evidence, route/security inventory and observed source addresses should agree. None of those runtime checks has run for this planned lab.</p></section><footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

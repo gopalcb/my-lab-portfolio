@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Codex multi-agent systems</title>
+<link rel="stylesheet" href="../read/reading.css">
+</head>
+<body>
+<main>
+<h1 class="breadcrumb">SYSTEM DESIGN / CODEX MULTI-AGENT SYSTEMS</h1>
+<p class="lede">Codex Multi-Agent Collaboration gives bounded local workers a durable way to receive assignments and return results. One coordinator keeps responsibility for scope, integration and the final outcome. A remote Bedrock Agents bridge is a separate, proposed extension.</p>
+
+<h2>Collaboration starts with an explicit choice</h2>
+<p>The implemented project is a standalone local plugin, <code>multi-agent@gb-multi-agent</code>. Its lifecycle gate recognizes a leading <code>/multi-agent</code> followed by task text. Installation alone does not activate collaboration. Ordinary prompts follow the regular workflow; an ordinary follow-up closes a prior active collaboration scope.</p>
+<p>Activation creates a scope and registers a root identity. Native children and externally supervised workers receive distinct identities with parent linkage. The hook supplies the assigned agent ID and client instructions. A request to collaborate is therefore separate from proof that registration succeeded.</p>
+<figure>
+<div class="system-diagram" role="group" aria-labelledby="cma-entry-title">
+<p class="diagram-title" id="cma-entry-title">1 / Choose the collaboration path</p>
+<section class="diagram-group">
+<h3 class="diagram-label">Alternative entry paths</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Ordinary prompt</strong><span>Regular workflow; no new collaboration registration. Close an existing scope on an ordinary follow-up.</span>
+</li>
+<li class="diagram-node">
+<strong>/multi-agent + task</strong><span>Trusted hook bridge activates local service, registers root and returns scoped identity.</span>
+</li>
+</ul>
+</section>
+<p class="diagram-note">Opt-in messaging and native agent spawning are separate capabilities. Neither silently substitutes for the other.</p>
+</div>
+</figure>
+<p>The installation receipt records version 0.1.0 and a profile hook bridge. Project documentation describes that bridge as a compatibility measure for CLI 0.163.0, where bundled handlers were not exposed. Hook review and trust remain prerequisites. The receipt establishes installation metadata, not current service health or a successful collaboration session.</p>
+
+<h2>A durable inbox carries the work</h2>
+<p>The local stack combines an authenticated loopback HTTP API, Flask, SQLAlchemy and SQLite. Waitress binds to <code>127.0.0.1</code> on an allocated port. Singleton locks protect startup. Private runtime data lives outside source and plugin cache, so refreshing code does not replace collaboration history.</p>
+<p>Identity, presence and events have separate responsibilities: <code>system-agents</code> identifies participants, <code>communication</code> tracks attachments and presence, and <code>events</code> stores assignments, claims and results. Recipients read their inbox, claim an assignment and persist completion or failure. Event ID reuse with identical content supports retry; conflicting content is rejected.</p>
+<figure>
+<div class="system-diagram" role="group" aria-labelledby="cma-inbox-title">
+<p class="diagram-title" id="cma-inbox-title">2 / From assignment to accepted work</p>
+<section class="diagram-group">
+<h3 class="diagram-label">Persist before processing</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Coordinator assigns</strong><span>Bounded task, named recipient, owned paths and acceptance criteria.</span>
+</li>
+<li class="diagram-node">
+<strong>Recipient claims</strong><span>Read durable inbox; atomically claim queued work before processing.</span>
+</li>
+<li class="diagram-node">
+<strong>Recipient returns</strong><span>Persist completed or failed result with evidence and blockers.</span>
+</li>
+</ol>
+</section>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group">
+<h3 class="diagram-label">Acceptance remains a coordinator decision</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Review evidence</strong><span>Inspect changes against scope and run appropriate independent checks.</span>
+</li>
+<li class="diagram-node">
+<strong>Integrate or request correction</strong><span>One coordinator resolves conflicts and reports verified outcomes.</span>
+</li>
+</ul>
+</section>
+<p class="diagram-note">A stored message is task input. It cannot override user instructions or expand a worker's authority.</p>
+</div>
+</figure>
+<p>The durable inbox is the delivery contract. The optional native queue adapter is documented as best effort and unverified on the cited CLI version. Queue acceptance does not prove that an idle agent woke, claimed work or completed it. Explicit inbox handling keeps those stages observable.</p>
+
+<h2>Supervise execution and preserve uncertainty</h2>
+<p>A named <code>launch_agent</code> event targets the reserved <code>system</code> recipient. The dispatcher validates prompt, workspace and launch mode, limits each scope to three live external workers, and creates a private job receipt before starting execution. The working directory must resolve within the initiating workspace. This check constrains launch location; it is not a filesystem sandbox.</p>
+<figure>
+<div class="system-diagram" role="group" aria-labelledby="cma-worker-title">
+<p class="diagram-title" id="cma-worker-title">3 / Local worker lifecycle</p>
+<section class="diagram-group">
+<h3 class="diagram-label">Validate and record</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Claim launch event</strong><span>Validate active scope, prompt, workspace, mode and worker limit.</span>
+</li>
+<li class="diagram-node">
+<strong>Write job receipt</strong><span>Register worker identity and preserve event correlation before launch.</span>
+</li>
+<li class="diagram-node">
+<strong>Start supervisor</strong><span>Fixed argument array; task text follows the CLI option separator.</span>
+</li>
+</ol>
+</section>
+<div class="diagram-divider">Execution alternatives</div>
+<section class="diagram-group">
+<h3 class="diagram-label">Same supervision contract</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Process mode</strong><span>Supervised codex exec with heartbeat, output artifact and exit result.</span>
+</li>
+<li class="diagram-node">
+<strong>macOS Terminal mode</strong><span>Visible window starts the supervisor through an escaped runner command.</span>
+</li>
+</ul>
+</section>
+<p class="diagram-note">Launch handling completion and the worker's later exit result are separate events. Neither alone proves acceptance criteria passed.</p>
+</div>
+</figure>
+<p>The supervisor observes scope and worker presence, heartbeats during execution and terminates an inactive worker. Service reconciliation handles owner death and stale leases; inactive scopes eventually allow service shutdown. Heartbeats demonstrate liveness without converting idle state into working state.</p>
+<p>Recovery retains claimed launches whose external effects are uncertain rather than blindly replaying them. Coordinator review must reconcile outcomes before retry. Explicit file ownership, preservation of other workers' edits and controlled integration remain essential: messages and lease expiry cannot prevent every conflicting write.</p>
+
+<h2>Proposed extension: Bedrock Agents bridge</h2>
+<p><strong>Status: design only.</strong> The <code>aws-bedrock-agent-caller</code> directory is empty in the inspected checkout. No remote adapter implementation or cloud execution is established. The proposal adds a custom tool or MCP bridge that sends only approved task inputs to an allowlisted Bedrock agent and alias.</p>
+<figure>
+<div class="system-diagram" role="group" aria-labelledby="cma-bedrock-title">
+<p class="diagram-title" id="cma-bedrock-title">4 / Proposed remote boundary</p>
+<section class="diagram-group">
+<h3 class="diagram-label">Explicit authorization before a remote request</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Coordinator selects inputs</strong><span>Bounded task, approved data and expected output; retain local integration ownership.</span>
+</li>
+<li class="diagram-node">
+<strong>Proposed adapter validates</strong><span>Explicit identity, profile, region, IAM scope, allowed agent/alias and task-to-session mapping.</span>
+</li>
+<li class="diagram-node">
+<strong>Bedrock InvokeAgent</strong><span>Agent ID, alias ID and session ID identify the remote conversation.</span>
+</li>
+</ol>
+</section>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group">
+<h3 class="diagram-label">Bound and inspect the response</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Consume event stream</strong><span>Apply response limits and deadlines; preserve errors and incomplete outcomes.</span>
+</li>
+<li class="diagram-node">
+<strong>Normalize result</strong><span>Return task correlation, output and uncertainty; gate any returned action request.</span>
+</li>
+<li class="diagram-node">
+<strong>Coordinator verifies</strong><span>Review evidence and authorize any subsequent local action separately.</span>
+</li>
+</ol>
+</section>
+<p class="diagram-note">This static portfolio document never invokes a local runtime or remote service.</p>
+</div>
+</figure>
+<p>Bedrock Agents <code>InvokeAgent</code> returns an event stream and can return control for configured actions. The proposed bridge must handle those outcomes explicitly; a remote response grants no local filesystem access. AgentCore <code>InvokeAgentRuntime</code> addresses a different runtime interface. Bedrock managed multi-agent collaboration uses an AWS supervisor with collaborator agents; that is another orchestration model, separate from this local coordinator and inbox design.</p>
+<p>Implementation would need bounded retries, cancellation semantics, session isolation and explicit handling of uncertain remote effects. Those are proposed requirements. Current review confirms local source structure and the empty adapter directory; it does not establish live hook trust, worker execution, IAM readiness or remote success.</p>
+</main>
+</body>
+</html>
+

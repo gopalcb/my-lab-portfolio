@@ -1,0 +1,294 @@
+/* Shared light-only reader palette, also used by standalone project articles. */
+html[data-portfolio-theme="light"] { color-scheme: light; }
+html[data-portfolio-theme="light"] body {
+  background: #f5f4ef !important;
+  color: #26322f !important;
+}
+html[data-portfolio-theme="light"] h1,
+html[data-portfolio-theme="light"] strong,
+html[data-portfolio-theme="light"] th { color: #26322f !important; }
+html[data-portfolio-theme="light"] h2,
+html[data-portfolio-theme="light"] h3 {
+  color: #214b3d !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: -.02em !important;
+  line-height: 1.45 !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] h1.breadcrumb,
+html[data-portfolio-theme="light"] .breadcrumb {
+  color: #26322f !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-weight: 700 !important;
+  letter-spacing: .07em !important;
+  text-transform: uppercase !important;
+}
+html[data-portfolio-theme="light"] .diagram-head h2 {
+  color: #26322f !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-weight: 700 !important;
+  letter-spacing: .06em !important;
+  line-height: 1.55 !important;
+  text-transform: uppercase !important;
+}
+html[data-portfolio-theme="light"] p,
+html[data-portfolio-theme="light"] li,
+html[data-portfolio-theme="light"] td,
+html[data-portfolio-theme="light"] small,
+html[data-portfolio-theme="light"] figcaption,
+html[data-portfolio-theme="light"] .lede,
+html[data-portfolio-theme="light"] .diagram-note,
+html[data-portfolio-theme="light"] .resource-context {
+  color: #4d5c57 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] .opening-copy p,
+html[data-portfolio-theme="light"] .diagram-head p,
+html[data-portfolio-theme="light"] .lane-label > p,
+html[data-portfolio-theme="light"] .card p,
+html[data-portfolio-theme="light"] .route > p,
+html[data-portfolio-theme="light"] .tool-card p,
+html[data-portfolio-theme="light"] .bedrock-card p,
+html[data-portfolio-theme="light"] .doc-intro p,
+html[data-portfolio-theme="light"] .doc-heading p,
+html[data-portfolio-theme="light"] .doc-card p {
+  color: #43544e !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.9 !important;
+}
+html[data-portfolio-theme="light"] p,
+html[data-portfolio-theme="light"] li,
+html[data-portfolio-theme="light"] td,
+html[data-portfolio-theme="light"] small,
+html[data-portfolio-theme="light"] figcaption,
+html[data-portfolio-theme="light"] .diagram-node span,
+html[data-portfolio-theme="light"] .workflow-tiles span,
+html[data-portfolio-theme="light"] .mini-flow,
+html[data-portfolio-theme="light"] .closeout-flow > span,
+html[data-portfolio-theme="light"] .remote-flow > span,
+html[data-portfolio-theme="light"] .remote-flow > strong {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] a { color: #17624c !important; }
+html[data-portfolio-theme="light"] .sidebar {
+  background: #f5f4ef !important;
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .site-nav a,
+html[data-portfolio-theme="light"] .project-nav a,
+html[data-portfolio-theme="light"] .nav-label,
+html[data-portfolio-theme="light"] .sidebar-social {
+  color: #5b6b65 !important;
+}
+html[data-portfolio-theme="light"] .site-nav a[aria-current],
+html[data-portfolio-theme="light"] .item-list a[aria-current],
+html[data-portfolio-theme="light"] .project-nav a[aria-current],
+html[data-portfolio-theme="light"] .site-nav a:hover,
+html[data-portfolio-theme="light"] .project-nav a:hover,
+html[data-portfolio-theme="light"] .sidebar-social a[href]:hover {
+  color: #0f6048 !important;
+}
+html[data-portfolio-theme="light"] .sidebar-social {
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .text-view > p:not(.section-label),
+html[data-portfolio-theme="light"] .reading-card p,
+html[data-portfolio-theme="light"] .pipeline-steps p,
+html[data-portfolio-theme="light"] .pipeline-diagram figcaption,
+html[data-portfolio-theme="light"] .logging-rail p {
+  color: #43544e !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+html[data-portfolio-theme="light"] .diagram-head > span,
+html[data-portfolio-theme="light"] .card-label,
+html[data-portfolio-theme="light"] .tag,
+html[data-portfolio-theme="light"] .article-tabs label,
+html[data-portfolio-theme="light"] .doc-intro > span,
+html[data-portfolio-theme="light"] .doc-heading > b,
+html[data-portfolio-theme="light"] .workflow-box > strong,
+html[data-portfolio-theme="light"] .diagram-title,
+html[data-portfolio-theme="light"] .diagram-label,
+html[data-portfolio-theme="light"] .boundary-label,
+html[data-portfolio-theme="light"] .service-badge,
+html[data-portfolio-theme="light"] .arch-cluster-label {
+  color: #0f6048 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-weight: 600 !important;
+  letter-spacing: .09em !important;
+  text-transform: uppercase !important;
+}
+html[data-portfolio-theme="light"] .notice,
+html[data-portfolio-theme="light"] .card,
+html[data-portfolio-theme="light"] .route,
+html[data-portfolio-theme="light"] .tool-card,
+html[data-portfolio-theme="light"] .bedrock-card,
+html[data-portfolio-theme="light"] .doc-card,
+html[data-portfolio-theme="light"] .diagram-node,
+html[data-portfolio-theme="light"] .arch-service,
+html[data-portfolio-theme="light"] .arch-subnet,
+html[data-portfolio-theme="light"] .arch-node,
+html[data-portfolio-theme="light"] .arch-pod,
+html[data-portfolio-theme="light"] .arch-container,
+html[data-portfolio-theme="light"] .reading-card,
+html[data-portfolio-theme="light"] .pipeline-steps li,
+html[data-portfolio-theme="light"] .pipeline-notes .card,
+html[data-portfolio-theme="light"] .prompt-card,
+html[data-portfolio-theme="light"] .plan-box,
+html[data-portfolio-theme="light"] .plan-flow li,
+html[data-portfolio-theme="light"] .test-fix-loop,
+html[data-portfolio-theme="light"] .closeout-flow > span,
+html[data-portfolio-theme="light"] .workflow-box,
+html[data-portfolio-theme="light"] .workflow-tiles > div,
+html[data-portfolio-theme="light"] .tool-loop,
+html[data-portfolio-theme="light"] .remote-flow > span,
+html[data-portfolio-theme="light"] .remote-flow > strong,
+html[data-portfolio-theme="light"] .logging-rail,
+html[data-portfolio-theme="light"] .custom-tools,
+html[data-portfolio-theme="light"] .collaboration,
+html[data-portfolio-theme="light"] .delivered {
+  background: #fbfaf7 !important;
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .diagram,
+html[data-portfolio-theme="light"] .system-diagram,
+html[data-portfolio-theme="light"] .aws-landscape,
+html[data-portfolio-theme="light"] .mermaid-scroll,
+html[data-portfolio-theme="light"] figure .scroll,
+html[data-portfolio-theme="light"] .pipeline-diagram,
+html[data-portfolio-theme="light"] .pipeline-section {
+  background: #f5f4ef !important;
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .article-tabs { border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] .article-tabs label { color: #5b6b65 !important; }
+html[data-portfolio-theme="light"] .article-tabs label:hover,
+html[data-portfolio-theme="light"] .article-tabs input:checked + label { color: #0f6048 !important; border-bottom-color: #0f6048 !important; }
+html[data-portfolio-theme="light"] .doc-intro { border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] .doc-intro h2,
+html[data-portfolio-theme="light"] .doc-heading h3,
+html[data-portfolio-theme="light"] .doc-card h3 { color: #214b3d !important; }
+html[data-portfolio-theme="light"] .doc-card > small { color: #5b6b65 !important; }
+html[data-portfolio-theme="light"] .implementation-list,
+html[data-portfolio-theme="light"] .code-caption { color: #43544e !important; }
+html[data-portfolio-theme="light"] .validation-strip { background: #edf4ef !important; border-color: #b7c8bf !important; color: #355247 !important; }
+html[data-portfolio-theme="light"] .validation-strip i { color: #17624c !important; }
+html[data-portfolio-theme="light"] .diagram img,
+html[data-portfolio-theme="light"] .mermaid-scroll img {
+  background: transparent !important;
+}
+html[data-portfolio-theme="light"] .mermaid-figure .mermaid-dark { display: none !important; }
+html[data-portfolio-theme="light"] .mermaid-figure .mermaid-light { display: block !important; }
+html[data-portfolio-theme="light"] pre,
+html[data-portfolio-theme="light"] .scroll {
+  background: #f0f3ef !important;
+  border-color: #cbd6d1 !important;
+  color: #26322f !important;
+}
+html[data-portfolio-theme="light"] pre code { background: transparent !important; }
+html[data-portfolio-theme="light"] th { background: #e7eee9 !important; }
+html[data-portfolio-theme="light"] footer { border-color: #cbd6d1 !important; color: #5c6a66 !important; }
+html[data-portfolio-theme="light"] .project-status,
+html[data-portfolio-theme="light"] .plan-box,
+html[data-portfolio-theme="light"] .workflow-box,
+html[data-portfolio-theme="light"] .test-fix-loop,
+html[data-portfolio-theme="light"] .prompt-card,
+html[data-portfolio-theme="light"] .bedrock-card {
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .diagram-title,
+html[data-portfolio-theme="light"] .diagram-label,
+html[data-portfolio-theme="light"] .boundary-label,
+html[data-portfolio-theme="light"] .service-badge,
+html[data-portfolio-theme="light"] .arch-cluster-label { color: #0f6048 !important; }
+html[data-portfolio-theme="light"] .diagram-divider,
+html[data-portfolio-theme="light"] .lane,
+html[data-portfolio-theme="light"] h2 { border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] .card h2,
+html[data-portfolio-theme="light"] .route h2,
+html[data-portfolio-theme="light"] .tool-card h3,
+html[data-portfolio-theme="light"] .bedrock-card h3,
+html[data-portfolio-theme="light"] .collaboration h3,
+html[data-portfolio-theme="light"] .plan-flow strong,
+html[data-portfolio-theme="light"] .workflow-tiles b,
+html[data-portfolio-theme="light"] .cycle-step strong {
+  color: #214b3d !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] .notice > strong,
+html[data-portfolio-theme="light"] .mermaid-scroll th,
+html[data-portfolio-theme="light"] .plan-box > strong,
+html[data-portfolio-theme="light"] .plan-flow li strong,
+html[data-portfolio-theme="light"] .route.complex h2 {
+  color: #26322f !important;
+}
+html[data-portfolio-theme="light"] .notice p,
+html[data-portfolio-theme="light"] .mermaid-scroll td,
+html[data-portfolio-theme="light"] .plan-flow li > span {
+  color: #43544e !important;
+}
+html[data-portfolio-theme="light"] .mermaid-scroll th { background: #e7eee9 !important; border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] .mermaid-scroll td { border-color: #d2dcd7 !important; }
+html[data-portfolio-theme="light"] .mermaid-scroll tbody tr:hover td { background: rgba(23, 98, 76, .05) !important; }
+html[data-portfolio-theme="light"] .diagram-node strong,
+html[data-portfolio-theme="light"] .diagram-node span {
+  color: #26322f !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] .connector,
+html[data-portfolio-theme="light"] .flow-caption,
+html[data-portfolio-theme="light"] .mini-flow,
+html[data-portfolio-theme="light"] .diagram-transition,
+html[data-portfolio-theme="light"] .diagram-footer,
+html[data-portfolio-theme="light"] .path-connector,
+html[data-portfolio-theme="light"] .plan-intro {
+  color: #5b6b65 !important;
+}
+html[data-portfolio-theme="light"] .outcomes span {
+  background: #fbfaf7 !important;
+  border-color: #b7c8bf !important;
+  color: #17624c !important;
+}
+html[data-portfolio-theme="light"] .outcomes span:nth-child(2) {
+  border-color: #c7aaa5 !important;
+  color: #8b3f36 !important;
+}
+html[data-portfolio-theme="light"] .outcomes span:nth-child(3) {
+  border-color: #cdbb98 !important;
+  color: #80551c !important;
+}
+
+/* Shared light surfaces for tables, inline code and syntax-highlighted samples. */
+html[data-portfolio-theme="light"] table,
+html[data-portfolio-theme="light"] tbody,
+html[data-portfolio-theme="light"] tr,
+html[data-portfolio-theme="light"] td { background: #fbfaf7 !important; border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] tbody tr:nth-child(even) td { background: #f0f3ef !important; }
+html[data-portfolio-theme="light"] code { background: #e9efe9 !important; color: #264c3e !important; border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] pre code { background: transparent !important; color: #26322f !important; }
+html[data-portfolio-theme="light"] pre::before { color: #53625d !important; }
+html[data-portfolio-theme="light"] .token.comment { color: #596960 !important; }
+html[data-portfolio-theme="light"] .token.key { color: #245b83 !important; }
+html[data-portfolio-theme="light"] .token.string { color: #306031 !important; }
+html[data-portfolio-theme="light"] .token.number { color: #80511f !important; }
+html[data-portfolio-theme="light"] .token.keyword { color: #6e428c !important; }
+
+
+/* Matte code panels within an otherwise light-only reader. */
+html[data-portfolio-theme="light"] pre,
+html[data-portfolio-theme="light"] .scroll:has(> pre) { background: #1b2023 !important; color: #dbe7e2 !important; border-color: #37423f !important; }
+html[data-portfolio-theme="light"] pre code { background: transparent !important; color: #dbe7e2 !important; border: 0 !important; }
+html[data-portfolio-theme="light"] pre::before { color: #a3b4ad !important; }
+html[data-portfolio-theme="light"] pre .token.comment { color: #a3b4ad !important; }
+html[data-portfolio-theme="light"] pre .token.key { color: #92ccec !important; }
+html[data-portfolio-theme="light"] pre .token.string { color: #b8dda0 !important; }
+html[data-portfolio-theme="light"] pre .token.number { color: #e9bb87 !important; }
+html[data-portfolio-theme="light"] pre .token.keyword { color: #c9b2ef !important; }
+html[data-portfolio-theme="light"] .repository-link { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border: 1px solid #cbd6d1; border-radius: 4px; background: #fbfaf7; color: #17624c !important; font: 700 11px/1.9 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; text-decoration: none; }
+html[data-portfolio-theme="light"] .repository-link:hover { background: #e9efe9; border-color: #17624c; }

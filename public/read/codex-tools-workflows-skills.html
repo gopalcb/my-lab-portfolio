@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tools, workflows and skills</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / TOOLS, WORKFLOWS AND SKILLS</h1>
+<p class="lede">Follow one portfolio change through the actual GB Systems development loop: choose guidance, call bounded tools, validate the result and leave an honest handoff.</p></header><aside class="notice"><strong>WORKSPACE SNAPSHOT · 18 OCTOBER 2026</strong><p>This describes the current local instructions, configuration and source. Examples show how to reproduce checks; they are not proof of a fresh install, backend memory health or cloud readiness.</p></aside><section id="roles"><h2>Guidance and execution have different jobs</h2>
+<p>A tool performs an operation. A skill explains when and how to combine operations. A workflow defines the project’s stages and evidence expectations. The agent interprets results and decides what to do next within the user’s scope. None of these files can guarantee that an application is correct without observing it.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="tools-layers-title">
+<p class="diagram-title" id="tools-layers-title">From request to useful evidence</p>
+<section class="diagram-group"><h3 class="diagram-label">Working chain</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Request + project context</strong><span>Locate the actual source and instructions</span>
+</li>
+<li class="diagram-node">
+<strong>Relevant skill + workflow</strong><span>Select a proportionate route and acceptance criteria</span>
+</li>
+<li class="diagram-node">
+<strong>Tool call + result review</strong><span>Execute bounded work and compare actual output</span>
+</li>
+</ol></section><p class="diagram-note">Load the relevant guidance progressively. A long catalog of skills is not a reason to read every skill for each task.</p>
+</div></figure></section><section id="example"><h2>A concrete change: new portfolio content</h2>
+<p>For this portfolio, a new article starts as a standalone HTML document in <code>public/read</code>. Its metadata belongs to <code>src/app/content/content.catalog.ts</code>. Angular fetches that document through <code>ContentService</code>, and a sandboxed iframe renders its markup and relative stylesheet. Authored HTML stays outside the application template.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable resource table"><table>
+<thead><tr>
+<th scope="col">Resource</th>
+<th scope="col">Responsibility</th>
+<th scope="col">Evidence</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>content.catalog.ts</code></td>
+<td>ID, title, summary, HTML location and optional topic</td>
+<td>Correct route and selected sidebar title</td>
+</tr>
+<tr>
+<td><code>ContentService</code></td>
+<td>Validate metadata/URL, fetch and isolate HTML</td>
+<td>Loading/error/retry and sandbox checks</td>
+</tr>
+<tr>
+<td><code>public/read/reading.css</code></td>
+<td>Compact typography and HTML diagrams</td>
+<td>Desktop/mobile inspection and no content clipping</td>
+</tr>
+</tbody>
+</table></div>
+<p>A typo in a title can be handled directly. A change to loading, sandbox policy or route behavior has a wider contract and needs a proportionate reviewed plan. The impact and uncertainty determine the route, rather than the number of files.</p></section><section id="development"><h2>Plan, implement and verify in the main thread</h2>
+<p>For planned changes, <code>workflows/development.md</code> points to <code>plan-development</code> and <code>implement-development</code>. Planning inspects source and defines observable criteria. Implementation follows those criteria, checks the final changes and records what actually passed. A changed architecture or scope returns to planning; a routine local defect can be fixed within the existing plan.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="tools-stages-title">
+<p class="diagram-title" id="tools-stages-title">One accountable development loop</p>
+<section class="diagram-group"><h3 class="diagram-label">Before implementation</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Inspect + clarify</strong><span>Existing code, contracts, tests and necessary questions</span>
+</li>
+<li class="diagram-node">
+<strong>Reviewed plan</strong><span>Scope, tasks, acceptance criteria and verification</span>
+</li>
+<li class="diagram-node">
+<strong>Implement + inspect</strong><span>Preserve unrelated edits; keep records current</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Before completion</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Run relevant checks</strong><span>Observe output, UI flow or data behavior</span>
+</li>
+<li class="diagram-node">
+<strong>Resolve failures</strong><span>Fix and retest; revisit material plan changes</span>
+</li>
+<li class="diagram-node">
+<strong>Summarize evidence</strong><span>Passes, limitations and a concrete remaining step</span>
+</li>
+</ol></section><p class="diagram-note">Planner and builder are responsibilities first. The current default runs these stages in the main conversation; optional specialists do not remove its accountability.</p>
+</div></figure></section><section id="skills"><h2>Give repeatable work a narrow entry point</h2>
+<p>A skill’s description lets the agent decide whether it is relevant; <code>SKILL.md</code> provides the procedure, with supporting scripts/templates only where needed. Repository discovery exposes selected workspace skills through <code>.agents/skills</code> links; the maintained instructions live under the configured skill directory.</p>
+<ul>
+<li>
+<code>python-development</code>: validation boundaries, readable structure, architecture and code-map conventions for real Python changes.</li>
+<li>
+<code>ui-testing-and-debugging</code>: clear requirements, Computer Use observations, DevTools diagnosis and fix/retest evidence.</li>
+<li>
+<code>glue-pipeline-builder</code>: dedicated MatchLake contracts and delivery/recovery gates; not a generic requirement for all AWS work.</li>
+<li>
+<code>plan-development</code> / <code>implement-development</code>: the project’s planned engineering stages.</li>
+<li>
+<code>project-expertise</code> workflow: discovery and solution design when a brief needs refinement before building.</li>
+</ul>
+<p>A skill is editable project guidance, so keep it specific and consistent with the user’s current instructions. Update the narrow responsible procedure when a repeatable failure is found, rather than duplicating a rule across every document.</p></section><section id="custom-tools"><h2>Use custom tools where the contract is mechanical</h2>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable resource table"><table>
+<thead><tr>
+<th scope="col">Tool directory</th>
+<th scope="col">Bounded job</th>
+<th scope="col">Meaningful limit</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>tools/runtime_logger</code></td>
+<td>Append factual milestone records</td>
+<td>Agent reporting is not automatic audit evidence</td>
+</tr>
+<tr>
+<td>
+<code>tools/initializer</code> + <code>folder-watcher</code>
+</td>
+<td>Prepare helpers, launch watcher, maintain configured index</td>
+<td>Launch/process existence is not content correctness</td>
+</tr>
+<tr>
+<td><code>tools/ui-testing-and-debugging</code></td>
+<td>Gate requirements and journal observed UI cycles</td>
+<td>CLI validates evidence structure, not screenshots’ truth</td>
+</tr>
+<tr>
+<td><code>tools/glue-pipeline-harness</code></td>
+<td>Project-specific fixture/release validation</td>
+<td>Local results do not prove authenticated AWS readiness</td>
+</tr>
+<tr>
+<td><code>tools/multi-agent/installation.json</code></td>
+<td>Locate the installed plugin/docs/client</td>
+<td>Installation is separate from opt-in activation</td>
+</tr>
+</tbody>
+</table></div>
+<figure><div class="system-diagram" role="group" aria-labelledby="tools-ui-title">
+<p class="diagram-title" id="tools-ui-title">UI work connects the screen to diagnostics</p>
+<section class="diagram-group"><h3 class="diagram-label">Portfolio UI procedure</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Requirements gate</strong><span>Routes, viewports, expected behavior and source revision</span>
+</li>
+<li class="diagram-node">
+<strong>Computer Use + DevTools</strong><span>Inspect layout/flow, actual request/response and console</span>
+</li>
+<li class="diagram-node">
+<strong>Fix + repeat</strong><span>Retest affected scenarios and retain matching evidence</span>
+</li>
+</ol></section><p class="diagram-note">The primary browser driver is Computer Use. Supplemental automated checks are labeled separately; a structure-valid journal is not a substitute for observation.</p>
+</div></figure></section><section id="finish"><h2>Use results to decide what comes next</h2>
+<p>A successful command exit may still leave the wrong page, a stale artifact or a missing integration. Inspect the result against the requirement: the article loaded, the diagram fits, the route selects the correct entry, and relevant requests and console output are explained.</p>
+<ul>
+<li>Preserve another worker’s edits and give parallel work exclusive ownership.</li>
+<li>Keep task records under the affected project; shared UI records use the canonical UI tool directory.</li>
+<li>Separate local tests, browser observations and cloud/deployed checks.</li>
+<li>Report a concrete blocker when required evidence cannot be obtained. Do not convert an unrun check into a pass.</li>
+</ul></section><footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

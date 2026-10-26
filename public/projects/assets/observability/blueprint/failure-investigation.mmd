@@ -1,0 +1,11 @@
+flowchart TD
+  B["Angular: profile unavailable"] --> A["web-api HTTP 503"]
+  A --> U["user-service upstream request fails"]
+  U --> P["profile-service profile.load fails"]
+  P --> DB["Database operation timed out"]
+  DB -. "root failure span" .-> T["Tempo trace"]
+  P -. "error log + trace_id" .-> L["Loki"]
+  P -. "error_code + version" .-> E["Elasticsearch"]
+  T --> I["Investigation"]
+  L --> I
+  E --> I

@@ -1,0 +1,13 @@
+flowchart TB
+  Q["New request + trusted project scope"] --> L["Load instructions and exact task records"]
+  L --> R["Optional semantic recall: embed query with Bedrock"]
+  R --> S["OpenSearch: authorized project + unexpired memories"]
+  S --> V["Verify source revision; select small cited context"]
+  V --> W["Reason, use tools and validate"]
+  W --> H["Save task evidence in authoritative records"]
+  H --> A{"Approved durable learning?"}
+  A -->|No| E["Finish without a memory write"]
+  A -->|Yes| C["Redact, chunk and attach source + expiry"]
+  C --> B["Bedrock embedding"]
+  B --> I["Upsert derived OpenSearch memory"]
+  I -. "Available to a later request" .-> S

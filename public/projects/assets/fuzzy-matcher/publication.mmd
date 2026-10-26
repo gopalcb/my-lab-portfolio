@@ -1,0 +1,18 @@
+sequenceDiagram
+    participant J as Glue driver
+    participant S as S3 attempt data
+    participant M as S3 commit key
+    participant C as Consumer
+    J->>M: Read existing logical-run commit
+    alt Valid committed run exists
+        M-->>J: Existing identity and output locations
+    else No committed run
+        J->>S: Write unique attempt datasets
+        J->>J: Validate counts and complete Glue bookkeeping
+        J->>M: Put commit with If-None-Match star
+        alt Commit race lost
+            M-->>J: Existing commit, validate exact logical identity
+        end
+    end
+    C->>M: Read commit
+    C->>S: Read only datasets referenced by commit

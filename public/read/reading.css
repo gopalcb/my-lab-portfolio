@@ -1,0 +1,36 @@
+*{box-sizing:border-box}
+html{color-scheme:dark;scroll-behavior:auto}
+body{margin:0;background:#101619;color:#c8d6d1;font:13px/1.9 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:auto;padding:32px clamp(20px,3vw,48px) 48px}
+h1.breadcrumb{font:400 11px/1.9 ui-monospace,SFMono-Regular,monospace;letter-spacing:.06em;color:#c8d6d1;margin:0 0 24px}
+h2,h3{color:#9de8cc;font-family:ui-monospace,SFMono-Regular,monospace;font-weight:400;letter-spacing:.09em;text-transform:uppercase;line-height:1.8}
+h2{font-size:13px;margin:34px 0 14px;padding-top:16px;border-top:1px solid #314047}
+h3{font-size:12px;margin:24px 0 10px}
+p{max-width:95ch;margin:10px 0 14px}a{color:#9de8cc;text-underline-offset:4px}a:hover{color:#c5ffe8;cursor:pointer}
+a:focus-visible,[tabindex]:focus-visible{outline:2px solid #9de8cc;outline-offset:4px}
+.lede{font-size:13px;color:#a5b4ba;margin-bottom:20px}
+.notice,.card{background:#171f23;border:1px solid #334448;border-radius:4px;padding:14px 18px;margin:20px 0}.notice strong{font:10px/1.8 ui-monospace,monospace;letter-spacing:.09em;color:#9de8cc}.notice p{font-size:12px;margin:8px 0 0;color:#a5b4ba}
+code{font:11.5px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;background:#1b282c;color:#b7ded0;border:1px solid #314047;border-radius:3px;padding:1px 4px}
+pre{margin:0;padding:12px 16px 16px;background:#121e24;line-height:1.8}pre::before{content:attr(data-language);display:block;font:9px/1.8 ui-monospace,monospace;letter-spacing:.12em;color:#879aa2;margin-bottom:8px}pre code{display:block;white-space:pre;overflow-wrap:normal;background:none;border:0;padding:0;color:#d3dfe5;font-size:11.5px}
+.token.comment{color:#869d99}.token.key{color:#83c7ed}.token.string{color:#b8dda0}.token.number{color:#e9bb87}.token.keyword{color:#c0a7ec}
+.scroll{width:100%;max-width:100%;overflow-x:auto;border:1px solid #334448;border-radius:4px;margin:14px 0}.scroll:focus-visible{outline:2px solid #9de8cc}figure{margin:22px 0}figure .scroll{background:#101619;padding:10px}figcaption{font-size:11px;line-height:1.8;color:#a5b4ba;max-width:100ch}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:12px;line-height:1.8}th,td{text-align:left;vertical-align:top;padding:10px 12px;border:1px solid #334448}th{background:#171f23;color:#9de8cc;font-weight:500}
+ul,ol{padding-left:21px}li{margin:5px 0}footer{border-top:1px solid #334448;padding-top:18px;margin-top:28px;color:#a5b4ba;font-size:11px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:18px}.sources li{margin:7px 0}section{scroll-margin-top:18px}
+@media(max-width:650px){main{padding:24px 18px 36px}.columns{grid-template-columns:1fr}h1.breadcrumb{font-size:10px}h2{font-size:12px}th,td{padding:8px 10px}}
+
+/* Script-free diagrams: neutral resource cards and one mint accent. */
+.system-diagram{padding:18px;background:#121b1f;border:1px solid #314047;border-radius:4px;overflow-wrap:anywhere}
+.diagram-title{font:11px/1.8 ui-monospace,monospace;letter-spacing:.06em;color:#9de8cc;margin:0 0 18px}
+.diagram-group{margin:0}.diagram-label{font:9px/1.8 ui-monospace,monospace;letter-spacing:.07em;color:#a5b4ba;margin:0 0 10px}
+.diagram-flow,.diagram-parallel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;list-style:none;margin:0;padding:0}
+.diagram-parallel{gap:12px}.diagram-parallel:has(> :last-child:nth-child(2)){grid-template-columns:repeat(2,minmax(0,1fr))}
+.diagram-node{position:relative;min-width:0;margin:0;padding:13px 12px;border:1px solid #40514e;border-radius:4px;background:#151f23;line-height:1.7}
+.diagram-node strong{display:block;color:#d3dfda;font:400 10.5px/1.8 ui-monospace,monospace;overflow-wrap:anywhere}
+.diagram-node span{display:block;margin-top:7px;color:#a5b4ba;font-size:11px;line-height:1.8}
+.diagram-flow>.diagram-node:not(:last-child)::after{content:'→';position:absolute;right:-21px;top:calc(50% - 12px);width:18px;text-align:center;color:#83958f;font-size:16px}
+.diagram-transition{color:#83958f;text-align:center;font:16px/1.4 ui-monospace,monospace;margin:12px 0}
+.diagram-note{font-size:11px;line-height:1.8;color:#a5b4ba;margin:16px 0 0;padding-top:12px;border-top:1px solid #314047;max-width:none}
+@media(max-width:650px){.system-diagram{padding:14px}.diagram-flow,.diagram-parallel,.diagram-parallel:has(> :last-child:nth-child(2)){grid-template-columns:1fr}.diagram-flow{gap:25px}.diagram-flow>.diagram-node:not(:last-child)::after{content:'↓';right:calc(50% - 9px);top:auto;bottom:-25px;height:24px;line-height:24px}.diagram-node strong{font-size:11px}.diagram-label{font-size:9px}}
+.resource-context{font-size:12px;color:#a5b4ba;margin:0 0 16px}
+
+.diagram-divider{border-top:1px solid #314047;margin:18px 0}

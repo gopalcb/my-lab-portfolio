@@ -1,0 +1,43 @@
+<a class="skip" href="#content-area" (click)="$event.preventDefault(); contentArea.focus()">Skip to content</a>
+<aside class="sidebar">
+  <nav class="site-nav" aria-label="Main navigation">
+    <a routerLink="/projects" [attr.aria-current]="state().kind === 'projects' ? 'page' : null">My lab</a>
+    <a routerLink="/about-me" [attr.aria-current]="state().kind === 'about' ? 'page' : null">About me</a>
+  </nav>
+  <section class="item-navigation" aria-label="Content list">
+    @if (state().kind === 'projects' || state().kind === 'read') {
+      @if (state().kind === 'projects') { <p class="nav-label">PROJECTS</p> }
+      <nav class="item-list" [class.reading-list]="state().kind === 'read'" [attr.aria-label]="state().kind === 'read' ? 'Articles' : 'Projects'">
+        @for (item of visibleItems(); track item.id) {
+          @if (state().kind === 'read' && ($index === 0 || item.topic !== visibleItems()[$index - 1].topic)) {
+            <p class="nav-label topic-label">{{ item.topic ?? 'DEV NOTES' }}</p>
+          }
+          <a [routerLink]="['/', state().kind, item.id]" [attr.aria-current]="state().selected?.id === item.id ? 'page' : null" [title]="item.summary">{{ item.title }}</a>
+        }
+      </nav>
+      @if (state().phase === 'loading-list') { <p class="list-status" role="status">Loading titles…</p> }
+      @if (state().phase === 'empty') { <p class="list-status">Nothing published yet.</p> }
+      @if (state().phase === 'catalog-error') { <p class="list-status">Titles couldn’t be loaded.</p> }
+    }
+  </section>
+  <div class="sidebar-footer">
+    <nav class="sidebar-social" aria-label="Social profiles"><a href="https://github.com/gopalcb" target="_blank" rel="noopener noreferrer">My GitHub</a><a href="https://www.linkedin.com/in/gopal-c-bala" target="_blank" rel="noopener noreferrer">My LinkedIn</a></nav>
+  </div>
+</aside>
+<main #contentArea id="content-area" tabindex="-1" [attr.aria-busy]="state().phase === 'loading-content' || state().phase === 'loading-list'">
+  @if (state().document; as document) {
+    <iframe class="content-frame" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" [srcdoc]="document" [title]="state().selected?.title ?? 'Portfolio content'"></iframe>
+  } @else {
+    <section class="message" aria-live="polite">
+      @switch (state().phase) {
+        @case ('loading-list') { <p role="status">Loading titles…</p> }
+        @case ('loading-content') { <p role="status">Loading {{ state().selected?.title }}…</p> }
+        @case ('catalog-error') { <h1>Titles couldn’t be loaded.</h1><p>Check your connection and try again.</p><button (click)="retry()">Try again</button> }
+        @case ('content-error') { <h1>This page couldn’t be loaded.</h1><p>{{ state().selected?.title }} is temporarily unavailable.</p><button (click)="retry()">Try again</button> }
+        @case ('empty') { <h1>Nothing published yet.</h1><p>New {{ state().kind === 'read' ? 'articles' : 'projects' }} will appear here.</p> }
+        @case ('not-found') { <h1>Page not found.</h1><p>Choose a title from the left, or <a routerLink="/projects">return to My lab</a>.</p> }
+        @default { <h1>Gopal C Bala</h1><p>gopalcb · he/him</p> }
+      }
+    </section>
+  }
+</main>

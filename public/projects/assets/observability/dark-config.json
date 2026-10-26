@@ -1,0 +1,27 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "background": "#192329",
+    "primaryColor": "#1d3028",
+    "primaryTextColor": "#e5ece8",
+    "primaryBorderColor": "#537861",
+    "lineColor": "#9de8cc",
+    "secondaryColor": "#252331",
+    "tertiaryColor": "#1d2b2b",
+    "fontFamily": "ui-monospace, SFMono-Regular, monospace",
+    "fontSize": "11px",
+    "actorBkg": "#1d3028",
+    "actorBorder": "#537861",
+    "actorTextColor": "#e5ece8",
+    "signalColor": "#b7c8ca",
+    "signalTextColor": "#e5ece8",
+    "labelBoxBkgColor": "#252331",
+    "labelBoxBorderColor": "#66567b",
+    "labelTextColor": "#e5ece8",
+    "loopTextColor": "#e5ece8",
+    "noteBkgColor": "#252331",
+    "noteTextColor": "#e5ece8"
+  },
+  "flowchart": { "htmlLabels": false, "curve": "linear" },
+  "themeCSS": ".node rect, .node polygon, .node circle, .actor, .labelBox { rx: 4px; ry: 4px; }"
+}

@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="What exists today, how the proposed EventHub platform fits together, and what evidence would turn a design into an operated system.">
+<title>EKS architecture</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / EKS ARCHITECTURE</h1>
+<p class="lede">What exists today, how the proposed EventHub platform fits together, and what evidence would turn a design into an operated system.</p></header><aside class="notice"><strong>PLANNED LAB · DOCUMENTATION ONLY</strong><p>The repository contains plans and drill guides. Application code, Terraform, CI and deployed EKS resources are not built yet. Diagrams show the target; commands and outcomes are examples, not recorded results.</p></aside><section id="today"><h2>What exists today</h2>
+<p class="resource-context">EventHub currently has a plan, failure-drill guide, rubric and implementation resource map; the workloads below are the build targets.</p>
+<p>The deliverable today is an engineering design: EventHub’s service boundaries, ordered implementation backlog, operational exercises and assessment criteria. The plan explains how to build a tenant-aware event-registration platform, how it can fail and what evidence would demonstrate recovery. It does not contain a working platform. A portfolio description should say “planned an EKS operations lab” until implementation produces verifiable results.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Exists now</th>
+<th scope="col">Proposed next</th>
+<th scope="col">Evidence still needed</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>README, architecture and delivery plan</td>
+<td>TypeScript services, infrastructure modules and charts</td>
+<td>Reviewed source, repeatable local tests and rendered manifests</td>
+</tr>
+<tr>
+<td>Forty defined failure categories</td>
+<td>Scoped injections and restoration procedures</td>
+<td>Executed drill reports, timestamps and correctness checks</td>
+</tr>
+<tr>
+<td>Mastery and interview rubric</td>
+<td>A reproducible portfolio demonstration</td>
+<td>Measured load, negative security tests, timed restore and cost inventory</td>
+</tr>
+</tbody>
+</table></div>
+<p>The learning value comes from connecting business correctness to platform operations. A green Deployment cannot prove that the last event ticket was sold once, that another tenant’s record was denied or that both asynchronous subscribers processed a registration.</p></section><section id="business"><h2>EventHub: a business transaction first</h2>
+<p class="resource-context">Follow synthetic-cedar through registration-service, its registration schema and the separately owned identity-service profile data.</p>
+<p>Imagine tenant Cedar running a conference with one remaining seat. Its user signs in, reads availability and submits a registration with an idempotency key. Two users may race for the seat. The registration service must enforce capacity inside a database transaction using appropriate locking or conditional updates plus uniqueness constraints. A prior HTTP read is only a snapshot; it is not a reservation.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="eks-architecture-business-boundaries-title">
+<p class="diagram-title" id="eks-architecture-business-boundaries-title">One registration, clear ownership</p>
+<section class="diagram-group"><h3 class="diagram-label">Sign in, then call the API</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>synthetic-cedar client</strong><span>OIDC token + idempotency key</span>
+</li>
+<li class="diagram-node">
+<strong>registration-service</strong><span>apps-dev · tenant and capacity checks</span>
+</li>
+<li class="diagram-node">
+<strong>registration schema</strong><span>Private RDS · registration + outbox transaction</span>
+</li>
+</ol></section><div class="diagram-divider" aria-hidden="true"></div>
+<section class="diagram-group"><h3 class="diagram-label">Separate profile boundary</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>synthetic-cedar client</strong><span>Keycloak-issued token; profile request</span>
+</li>
+<li class="diagram-node">
+<strong>identity-service</strong><span>apps-dev · verify JWT; own profile APIs</span>
+</li>
+<li class="diagram-node">
+<strong>identity schema</strong><span>Private RDS · separate role</span>
+</li>
+</ol></section><p class="diagram-note">JWT verification uses cached provider keys. Registration does not read identity-owned tables. These are two business paths, not one shared database role.</p>
+</div>
+<figcaption>EventHub target design · One registration, clear ownership.</figcaption></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Service</th>
+<th scope="col">Owns</th>
+<th scope="col">Boundary to preserve</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>identity-service</td>
+<td>Tenant/user profiles and application roles</td>
+<td>Does not implement an authorization server; does not give peers direct table access</td>
+</tr>
+<tr>
+<td>registration-service</td>
+<td>Events, capacity, expiry, registrations, idempotency and outbox</td>
+<td>Authoritative transaction for seat allocation</td>
+</tr>
+<tr>
+<td>notification-service</td>
+<td>Mock delivery records and processing keys</td>
+<td>Consumes notification queue; duplicate-safe processing</td>
+</tr>
+<tr>
+<td>audit-service</td>
+<td>Sanitized business audit records in S3</td>
+<td>Its own queue and least-privilege bucket access</td>
+</tr>
+<tr>
+<td>Python monitoring agent</td>
+<td>Synthetic checks and latency/error observations</td>
+<td>Dedicated test tenant; does not replace platform collectors</td>
+</tr>
+</tbody>
+</table></div>
+<p>Node.js, TypeScript and Fastify are the proposed HTTP and worker stack. They keep most application code in one language while exposing event-loop blocking, pool sizing and graceful shutdown. A small Python synthetic agent adds packaging and process-learning experience without making every service a separate technology project. The optional browser UI follows the core API.</p></section><section id="identity"><h2>Five identities, five different questions</h2>
+<p class="resource-context">The concrete identities are Keycloak users, EventHub service accounts, mesh gateway principals, CI publishers and human cluster operators.</p>
+<p>The OIDC provider—Keycloak for the learning stage or a managed provider comparison—authenticates users. A browser uses Authorization Code with PKCE. Each API verifies token signature, issuer, audience, allowed algorithms, expiry and required scopes, then enforces tenant and resource authorization. Cached public keys avoid making identity-service an obligatory synchronous hop on every request. Key rotation still needs a tested refresh path.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Identity</th>
+<th scope="col">Question answered</th>
+<th scope="col">Required negative test</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>End-user OIDC/JWT</td>
+<td>Who is the user and may this tenant access this object?</td>
+<td>Valid token from the wrong tenant is denied</td>
+</tr>
+<tr>
+<td>Human EKS access + RBAC</td>
+<td>May this operator perform this Kubernetes operation?</td>
+<td>Other namespaces and escalation remain denied</td>
+</tr>
+<tr>
+<td>Service account + EKS Pod Identity</td>
+<td>May this workload call this AWS action on this resource?</td>
+<td>Audit worker cannot write an unrelated bucket</td>
+</tr>
+<tr>
+<td>Mesh certificate + authorization policy</td>
+<td>Which service peer is connecting, and is it permitted?</td>
+<td>Authenticated wrong principal is denied</td>
+</tr>
+<tr>
+<td>GitHub OIDC build role</td>
+<td>May this workflow obtain short-lived AWS credentials?</td>
+<td>Untrusted branch/environment cannot assume the role</td>
+</tr>
+</tbody>
+</table></div>
+<p>Tenant IDs from request bodies are untrusted inputs. Query scope must derive from an authenticated authorization decision and be checked against the requested object. Namespaces help organize environments; they are not sufficient isolation for hostile tenants. TLS and IAM each solve a different part of this problem.</p></section><section id="request"><h2>A user request through the target platform</h2>
+<p class="resource-context">Gateway eventhub-public and HTTPRoute eventhub-registration connect the selected public API host to registration-service in apps-dev.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="eks-architecture-edge-mesh-trust-title">
+<p class="diagram-title" id="eks-architecture-edge-mesh-trust-title">The EventHub request path</p>
+<section class="diagram-group"><h3 class="diagram-label">Baseline · transport to application</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Public NLB</strong><span>TCP 443 · IP targets</span>
+</li>
+<li class="diagram-node">
+<strong>NGINX data-plane pod</strong><span>gateway-system · public TLS termination</span>
+</li>
+<li class="diagram-node">
+<strong>registration-service replica</strong><span>apps-dev · HTTP on 3000; JWT + tenant checks</span>
+</li>
+</ol></section><div class="diagram-divider" aria-hidden="true"></div>
+<section class="diagram-group"><h3 class="diagram-label">Later security-stage backend</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>NGINX data-plane pod</strong><span>Verify private gateway CA + hostname</span>
+</li>
+<li class="diagram-node">
+<strong>Private Istio gateway</strong><span>istio-system · separate TLS connection</span>
+</li>
+<li class="diagram-node">
+<strong>registration-service replica</strong><span>Mesh mTLS + allowed gateway principal</span>
+</li>
+</ol></section><p class="diagram-note">Route53 supplies the NLB address before the request. The later row replaces the baseline backend route only after policy and compatibility tests.</p>
+</div>
+<figcaption>EventHub target design · The EventHub request path.</figcaption></figure><p>The NLB supplies a public transport entry while NGINX makes HTTP routing decisions and terminates the browser’s TLS connection. GatewayClass chooses the implementation; Gateway defines listeners; HTTPRoute binds hosts and paths to backends. cert-manager’s restricted Route 53 DNS-01 identity obtains and renews the public certificate. The baseline does not terminate TLS at an ACM certificate on the NLB.</p>
+<p>The extra private Istio gateway is a later, explicit integration boundary. NGINX is not automatically an Istio workload. Its backend connection verifies the private gateway’s CA and hostname; this server TLS hop is distinct from mutual TLS. Istio then establishes mesh mTLS to services, and AuthorizationPolicy permits the intended gateway principal. Listener access is narrowed with NetworkPolicy. Compatibility, probes, metrics and JWT propagation must be tested before STRICT mTLS is enabled. </p>
+<p>NGINX Gateway Fabric is the target main path. The delivery plan first includes a bounded F5 NGINX Ingress Controller exercise and then migrates its route/TLS behavior to Gateway API. F5’s controller is separate from the retired Kubernetes community ingress-nginx project. The naming similarity is not a compatibility guarantee.</p></section><section id="events"><h2>One event, independent subscribers</h2>
+<p class="resource-context">registration-outbox-publisher reads the committed registration outbox; notification-service and audit-service consume separate subscriptions.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="eks-architecture-outbox-subscriber-fanout-title">
+<p class="diagram-title" id="eks-architecture-outbox-subscriber-fanout-title">A committed registration reaches both workers</p>
+<section class="diagram-group"><h3 class="diagram-label">Commit, then publish</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>registration-service</strong><span>Write registration + outbox atomically</span>
+</li>
+<li class="diagram-node">
+<strong>registration-outbox-publisher</strong><span>Read committed outbox; retry publication</span>
+</li>
+<li class="diagram-node">
+<strong>eventhub-dev-registration-events</strong><span>SNS · fan out one event to both subscriptions</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Independent subscriptions · parallel</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>eventhub-dev-notifications</strong><span>SQS → notification-service → mock-delivery record; own DLQ</span>
+</li>
+<li class="diagram-node">
+<strong>eventhub-dev-audit</strong><span>SQS → audit-service → audit S3 records; own DLQ</span>
+</li>
+</ul></section><p class="diagram-note">Both consumers receive their own copy. Publisher retries and worker redelivery require idempotency; replicas of one consumer share that consumer’s queue.</p>
+</div>
+<figcaption>EventHub target design · A committed registration reaches both workers.</figcaption></figure><p>Writing a registration and publishing an event are two systems’ operations. If the process commits SQL and crashes before sending, a direct dual write loses the event. The target outbox stores the registration and event in one database transaction. A publisher retries unsent events; a crash after publication but before marking the outbox row can publish duplicates. This is why consumers still need idempotency. </p>
+<p>SNS distributes each registration event to notification and audit SQS subscriptions. Multiple replicas on one SQS queue share that subscription’s work. They do not each get an independent copy. Visibility timeout bounds how long a received message is hidden; the worker acknowledges only after its durable processing step. A slow or crashed worker can cause redelivery. Poison messages go to a configured DLQ after bounded attempts, followed by reviewed repair and redrive.</p>
+<h3>An example event contract</h3>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable event example"><pre data-language="JSONC"><code class="language-jsonc"><span class="token comment">// Proposed event envelope, not captured runtime output.</span>
+{
+  <span class="token key">"eventId"</span>: <span class="token string">"example-registration-event-001"</span>,
+  <span class="token key">"type"</span>: <span class="token string">"registration.confirmed"</span>,
+  <span class="token key">"schemaVersion"</span>: <span class="token number">1</span>,
+  <span class="token key">"tenantId"</span>: <span class="token string">"synthetic-cedar"</span>,
+  <span class="token key">"registrationId"</span>: <span class="token string">"example-registration-001"</span>,
+  <span class="token key">"occurredAt"</span>: <span class="token string">"2026-10-18T12:00:00Z"</span>
+}
+<span class="token comment">// Add standard trace context when instrumentation is implemented.</span>
+<span class="token comment">// Consumers deduplicate by event ID within the intended scope.</span></code></pre></div>
+<p>Use an event ID and schema version, tenant scope, occurrence time and trace context in the event envelope. Keep personal data out of logs and minimize payloads. An idempotent processing record can protect a database side effect. It cannot alone guarantee exactly-once email delivery across an external provider boundary: use downstream idempotency or reconciliation. Audit retention, replay and schema evolution are separate operational decisions.</p></section><section id="stages"><h2>Build the platform in stages</h2>
+<p class="resource-context">Each stage builds the same EventHub workloads. The later mesh and scale stages extend that baseline rather than replace the business flow.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="eks-architecture-staged-readiness-title">
+<p class="diagram-title" id="eks-architecture-staged-readiness-title">Build EventHub in evidence-backed stages</p>
+<section class="diagram-group"><h3 class="diagram-label">First working vertical slice</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Linux + local cluster</strong><span>Learn process, limits, DNS and shutdown</span>
+</li>
+<li class="diagram-node">
+<strong>identity + registration</strong><span>Tenant denials, capacity races, outbox</span>
+</li>
+<li class="diagram-node">
+<strong>Workers + monitoring</strong><span>notification, audit, monitoring-agent</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Cloud platform</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Terraform + private EKS</strong><span>VPC, IAM, RDS, ECR and CNI</span>
+</li>
+<li class="diagram-node">
+<strong>NGINX + Argo CD</strong><span>HTTPS route and digest reconciliation</span>
+</li>
+<li class="diagram-node">
+<strong>Istio + operations</strong><span>Trust tests, signals, scaling and restore</span>
+</li>
+</ol></section><p class="diagram-note">All stages remain planned. Do not treat a successful controller install as proof of a correct registration or recovered dataset.</p>
+</div>
+<figcaption>EventHub target design · Build EventHub in evidence-backed stages.</figcaption></figure><ul>
+<li>Terraform owns AWS infrastructure, managed add-on versions and IAM associations.</li>
+<li>Bootstrap Helm installs Argo CD. Argo owns designated charts and applications; CI promotes tested image digests through Git. Keep one declared writer per resource.</li>
+<li>EKS manages control-plane hosts. Run node-level Linux labs on EC2 workers or a disposable kubeadm cluster; EKS etcd SSH access is not available.</li>
+</ul>
+<p>Private worker nodes and RDS keep the application/data plane off public addresses. A connected runner, VPN or documented SSM path supplies administration and bootstrap access. A stable on-demand system pool comes before constrained Karpenter application pools. HPA or KEDA scaling must respect address capacity and the aggregate PostgreSQL connection budget. More replicas can make a saturated database worse.</p>
+<p>Apps emit sanitized JSON and trace context. An OTel collection path feeds metrics, logs and traces into the proposed Prometheus/Grafana/Loki/Tempo stack, with one collector owner per stream. An in-cluster synthetic agent is useful but cannot independently detect total cluster failure; the capstone requires an outside probe as well.</p></section><section id="proof"><h2>Tradeoffs and readiness evidence</h2>
+<p class="resource-context">Readiness means a correct EventHub registration, both subscriber outcomes and tested denials—not only healthy pods.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Decision</th>
+<th scope="col">Benefit / cost</th>
+<th scope="col">Proof that would justify it</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>One RDS instance, service-owned schemas</td>
+<td>Lower learning cost; shared failure and capacity domain</td>
+<td>Role isolation, pool budget, restore and later separate-instance comparison</td>
+</tr>
+<tr>
+<td>NGINX plus later mesh gateway</td>
+<td>Explicit edge/mesh trust; added proxy and certificate burden</td>
+<td>Route parity, trust/identity denial tests and measured latency/resources</td>
+</tr>
+<tr>
+<td>Private cluster API</td>
+<td>Reduced public administration exposure; bootstrap complexity</td>
+<td>Authorized connected runner works and unauthorized path stays closed</td>
+</tr>
+<tr>
+<td>Self-hosted telemetry</td>
+<td>Learn collection/query/storage; substantial operational surface</td>
+<td>Signal-loss alert, retention/recovery and volume/cost measurements</td>
+</tr>
+<tr>
+<td>Staged HA profile</td>
+<td>Affordable learning baseline; weaker failure tolerance initially</td>
+<td>Record actual node/AZ/NAT/data profile rather than infer HA from replicas</td>
+</tr>
+</tbody>
+</table></div>
+<p>The proposed reference workload starts at 50 requests/second with a defined read/registration mix, 30 minutes steady state and a five-minute 5× burst. These numbers are test inputs, not measured capacity. A readiness report must identify the build digest, versions, hardware, placement, dataset, error classifications and percentiles, and report queue completion separately from HTTP acceptance.</p>
+<p>The plan’s graduation gate requires AC-1–AC-13, at least 30 distinct drills, 12 full incident reports including composite incidents, timed recovery, an upgrade rehearsal, measured cost/cleanup and a rubric score of at least 3 in every domain. Security, data correctness and recovery weaknesses cannot be hidden in an average. Today all runtime evidence remains pending.</p></section><footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

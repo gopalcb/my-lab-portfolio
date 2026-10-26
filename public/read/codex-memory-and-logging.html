@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Memory and logging</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / MEMORY AND LOGGING</h1>
+<p class="lede">Keep recall, task truth, message delivery and execution evidence separate so the next session can resume without mistaking an old note for a current result.</p></header><aside class="notice"><strong>WORKSPACE SNAPSHOT · 18 OCTOBER 2026</strong><p>This describes the current local instructions, configuration and source. Examples show how to reproduce checks; they are not proof of a fresh install, backend memory health or cloud readiness.</p></aside><section id="map"><h2>Four stores answer four different questions</h2>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable resource table"><table>
+<thead><tr>
+<th scope="col">Store</th>
+<th scope="col">Question</th>
+<th scope="col">Authority</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Native memory</td>
+<td>What prior learning may help?</td>
+<td>A retrieval hint to verify against current source</td>
+</tr>
+<tr>
+<td>Task plan/summary</td>
+<td>What was agreed, completed and left open?</td>
+<td>Task-scoped handoff with evidence links</td>
+</tr>
+<tr>
+<td>Runtime/activity logs</td>
+<td>What did a tool or agent report at a time?</td>
+<td>Observed or reported events with defined limits</td>
+</tr>
+<tr>
+<td>Multi-agent inbox</td>
+<td>Was a task message claimed/completed?</td>
+<td>Collaboration delivery state, only in opted-in tasks</td>
+</tr>
+</tbody>
+</table></div>
+<figure><div class="system-diagram" role="group" aria-labelledby="memory-stores-title">
+<p class="diagram-title" id="memory-stores-title">Use the right record for the question</p>
+<section class="diagram-group"><h3 class="diagram-label">Independent responsibilities</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Recall</strong><span>Find a likely procedure or earlier decision</span>
+</li>
+<li class="diagram-node">
+<strong>Task truth</strong><span>Plan, current state, accepted changes and next step</span>
+</li>
+<li class="diagram-node">
+<strong>Execution evidence</strong><span>Command output, screenshots, request results and artifacts</span>
+</li>
+</ul></section><p class="diagram-note">The inbox is an additional delivery ledger, not shared conversational memory. No single file proves all four kinds of state.</p>
+</div></figure></section><section id="retrieve"><h2>Retrieve a little, then verify</h2>
+<p>The inspected config enables the native memories feature. That is a setting, not proof that generated memory is fresh or complete. Begin with the task-relevant summary and registry, follow only useful pointers, and compare recalled claims with the current files and runtime evidence.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="memory-retrieval-title">
+<p class="diagram-title" id="memory-retrieval-title">A small memory pass</p>
+<section class="diagram-group"><h3 class="diagram-label">Recall to present evidence</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Task keywords</strong><span>Find the relevant registry entry or prior task record</span>
+</li>
+<li class="diagram-node">
+<strong>Specific source</strong><span>Read only the useful summary, procedure or code</span>
+</li>
+<li class="diagram-node">
+<strong>Current verification</strong><span>Resolve drift before relying on a recalled claim</span>
+</li>
+</ol></section><p class="diagram-note">For example, an older article used a monthly agent-log filename. The present runtime_logger code and README define yearly files; current source wins. Private memory content is not copied into public notes.</p>
+</div></figure><p>Some facts are cheap to recheck: a filename, config flag, test command or schema. Cloud identity and deployed readiness require the correct authorized environment. If a memory-derived fact is not reverified, say that it is recalled and may be stale.</p></section><section id="continuity"><h2>A checkpoint is a durable handoff</h2>
+<p>The project’s checkpoint workflow saves <code>plan.md</code> and <code>summary.md</code> with status, decisions, owned paths, completed checks and exact next steps. It does not magically freeze active workers or save every hidden part of a session. Record agents still running and obtain stable ownership handoffs when needed.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="memory-checkpoint-title">
+<p class="diagram-title" id="memory-checkpoint-title">Resume from evidence, not from a guess</p>
+<section class="diagram-group"><h3 class="diagram-label">Handoff and return</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Save scope + progress</strong><span>Task IDs, current decisions, changed files and limits</span>
+</li>
+<li class="diagram-node">
+<strong>Reopen task record</strong><span>Read plan/summary and inspect current working changes</span>
+</li>
+<li class="diagram-node">
+<strong>Continue next item</strong><span>Revalidate only evidence affected by drift</span>
+</li>
+</ol></section><p class="diagram-note">Keep task truth in records and architecture in project docs. A checkpoint request does not imply a Git commit, deployment or an edit to generated native memory.</p>
+</div></figure><p>Durable feedback such as <code>remember:</code> belongs in the narrowest authoritative project instruction or procedure after checking for conflicts. Ordinary corrections remain task-local. Generated native memory is client-managed; do not manually rewrite its summaries or use documentation work as permission to change it.</p></section><section id="logging"><h2>Write one factual event at the useful milestone</h2>
+<p>The maintained API is <code>write_activity(agent, event_message, project="")</code> in <code>tools/runtime_logger/runtime_logger.py</code>. It writes one INFO record with a generated timestamp and optional project prefix. Agent names must satisfy its validation; normalize a task name before passing it.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable python example"><pre data-language="PYTHON"><code class="language-python"><span class="token comment"># Example only: records an agent-reported milestone when executed.</span>
+<span class="token keyword">import</span> os
+<span class="token keyword">import</span> sys
+<span class="token keyword">from</span> pathlib <span class="token keyword">import</span> Path
+
+sys.path.insert(<span class="token number">0</span>, str(Path(os.environ[<span class="token string">"CODEX_HOME"</span>]) / <span class="token string">"tools"</span> / <span class="token string">"runtime_logger"</span>))
+<span class="token keyword">from</span> runtime_logger <span class="token keyword">import</span> write_activity
+
+path = write_activity(
+    agent=<span class="token string">"root_docs"</span>,
+    event_message=<span class="token string">"Reviewed portfolio content and validation evidence."</span>,
+    project=<span class="token string">"my-work-portfolio"</span>,
+)
+print(path)</code></pre></div>
+<p>The current filename is <code>logs__root_docs__YYYY.log</code>. Runtime tools use the same timestamp/severity style in files such as <code>logs__initializer__YYYY.log</code> and <code>logs__folder-watcher__YYYY.log</code>. Existing historical monthly files are left in place. Year selection happens as records are written.</p>
+<ul>
+<li>Log meaningful milestones, not every read, question or repeated status.</li>
+<li>Keep events brief and factual; exclude tokens, credentials, full prompts and sensitive output.</li>
+<li>The logger uses thread/process coordination, but a retry after an uncertain write can duplicate a report.</li>
+<li>An agent’s “tests passed” event is not a replacement for the test result it describes.</li>
+</ul></section><section id="indexing"><h2>An index is discovery, not comprehension</h2>
+<p>The folder watcher’s configured processor scans selected document filenames and preserves existing catalog entries. New index entries receive an empty summary; maintaining this index does not mean the model has read or embedded every document. The processor’s temporary-file replacement avoids publishing a partially written index.</p>
+<p>The project’s <code>kb:</code> rule controls when an agent consults the KB. A background filename scan does not activate a KB lookup for ordinary prompts. Native memory, the KB document index and generated Python code maps serve different purposes.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="memory-index-title">
+<p class="diagram-title" id="memory-index-title">Index maintenance has a narrower contract</p>
+<section class="diagram-group"><h3 class="diagram-label">File discovery loop</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Watcher notification / reconcile</strong><span>Configured folder and extensions; ignore outputs</span>
+</li>
+<li class="diagram-node">
+<strong>Processor catalog</strong><span>Preserve matching metadata; add/remove paths</span>
+</li>
+<li class="diagram-node">
+<strong>Atomic output + log</strong><span>Publish index or retain failure evidence</span>
+</li>
+</ol></section><p class="diagram-note">Indexer events use the folder-watcher logger. Watcher supervision also has stderr logging, so the yearly file is not a complete transcript of every lifecycle event.</p>
+</div></figure></section><section id="limits"><h2>Preserve evidence and uncertainty together</h2>
+<p>A current log file does not prove a worker is healthy, an inbox completion does not prove the result is correct, and native recall does not prove that a code path still behaves the same way. Keep those claims attached to their actual checks and source revisions.</p>
+<ul>
+<li>For a resumed portfolio task, inspect the current catalog and HTML before relying on an older screenshot.</li>
+<li>For a UI result, retain route, viewport, source revision and observed outcome; keep primary and supplemental drivers distinct.</li>
+<li>For a runtime incident, correlate timestamps across the appropriate streams without exporting credentials or private session data.</li>
+<li>If a write or required check fails, report it and continue unaffected work; do not hide the missing record.</li>
+</ul></section><footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

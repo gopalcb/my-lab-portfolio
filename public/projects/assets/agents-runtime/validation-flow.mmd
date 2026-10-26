@@ -1,0 +1,10 @@
+flowchart LR
+    Change[Completed change] --> Tests[Run checks]
+    Tests --> Outcome{What did evidence show?}
+    Outcome -->|PASS| Context[Save context + evidence]
+    Outcome -->|FAIL| Fix[Explain + fix]
+    Outcome -->|BLOCKED| Blocked[Record blocker]
+    Fix --> Tests
+    Context --> Return[Return outcome]
+    Blocked --> Return
+    Return --> Resume[Next request]

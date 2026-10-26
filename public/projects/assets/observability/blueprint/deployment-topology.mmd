@@ -1,0 +1,38 @@
+flowchart TB
+    Browser["Browser<br/>Angular UI"]
+    Entry["Port-forward for demo<br/>or external ingress"]
+    Browser -->|"GET /api/users/42/profile"| Entry
+
+    subgraph EKS["AWS EKS — one EC2 worker node"]
+      direction TB
+      S1["Kubernetes Service: web-api"]
+      S2["Kubernetes Service: user-service"]
+      S3["Kubernetes Service: profile-service"]
+
+      subgraph Pod1["Application Pod 1: web-api"]
+        API["Node.js API<br/>+ Angular static assets"]
+        COL["OpenTelemetry Collector<br/>sidecar container"]
+      end
+      subgraph Pod2["Application Pod 2"]
+        USER["user-service<br/>Node.js"]
+      end
+      subgraph Pod3["Application Pod 3"]
+        PROFILE["profile-service<br/>Node.js"]
+      end
+
+      S1 --> API
+      API --> S2 --> USER
+      USER --> S3 --> PROFILE
+      API -. OTLP .-> COL
+      USER -. OTLP .-> COL
+      PROFILE -. OTLP .-> COL
+    end
+
+    Entry --> S1
+    PROFILE -->|"optional SQL SELECT"| DB[("External PostgreSQL")]
+    COL -. Traces .-> TEMPO[("Tempo")]
+    COL -. Logs .-> LOKI[("Loki")]
+    COL -. Logs .-> ES[("Elasticsearch")]
+    TEMPO --> G["Grafana"]
+    LOKI --> G
+    ES --> K["Kibana"]

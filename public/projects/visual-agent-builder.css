@@ -1,0 +1,21 @@
+/* Article-only presentation; shared reader styles own typography and themes. */
+.demo { margin: 0 0 28px; }
+.demo-frame { min-height: 250px; aspect-ratio: 16 / 7; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 28px; border: 1px dashed #71877e; border-radius: 8px; text-align: center; background: linear-gradient(135deg, #789d8b12, #789d8b04); }
+.demo-frame h2 { border: 0; margin: 0; padding: 0; letter-spacing: .02em; text-transform: none; font: 500 clamp(18px, 2.4vw, 26px)/1.4 system-ui, sans-serif; color: inherit; }
+.demo-frame p { margin: 0; }
+.demo-symbol { font: 44px/1 system-ui, sans-serif; }
+.demo-frame > span:last-child, .demo-caption, .source-note { font-size: 11px; opacity: .85; }
+.demo-caption { margin-top: 10px; }
+.source-note { margin-top: 16px; }
+.scroll pre { min-width: max-content; }
+@media (max-width: 650px) {
+  .demo-frame { min-height: 230px; aspect-ratio: auto; padding: 22px 14px; }
+}
+
+.runtime-mermaid .mermaid-diagram { padding: 18px; background: #f5f4ef; }
+.runtime-mermaid img { display: block; width: min(100%, 760px); min-width: 560px; height: auto; margin: 0 auto; }
+.runtime-mermaid figcaption { margin-top: 10px; }
+
+.project-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 24px; }
+.project-header h1.breadcrumb { margin: 0; }
+@media (max-width: 650px) { .project-header { flex-direction: column; gap: 12px; } }

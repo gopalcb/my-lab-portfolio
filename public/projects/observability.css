@@ -1,0 +1,54 @@
+/* Local article styles; the portfolio reader supplies the theme. */
+.observability { --article-size: 13px; font-size: var(--article-size); }
+.observability main { max-width: 1120px; margin-inline: auto; }
+.observability .opening-copy { max-width: 88ch; }
+.observability .article-tabs { gap: 24px; flex-wrap: wrap; overflow: visible; }
+.observability .article-tabs label { padding-block: 10px; letter-spacing: .06em; }
+.observability .article-tabs:has(#elastic-tab:checked) label[for="elastic-tab"] { border-bottom-color: var(--mint); color: var(--mint); font-weight: 700; }
+.observability .article-tabs:has(#elastic-tab:checked) ~ #elastic-panel { display: block; }
+.observability .tab-panel { padding-top: 28px; }
+.observability .article-section { margin: 0 0 34px; }
+.observability .article-section h2 { font-size: 20px; font-weight: 550; margin-bottom: 12px; }
+.observability .article-section h3 { font-size: 15px; font-weight: 600; margin: 24px 0 8px; }
+.observability .article-section p,
+.observability .article-section li,
+.observability .article-section figcaption { font-size: var(--article-size); line-height: 1.85; color: var(--muted); }
+.observability .article-section p + p { margin-top: 12px; }
+.observability .article-section ul,
+.observability .article-section ol { padding-left: 22px; margin: 12px 0 0; }
+.observability .article-section li + li { margin-top: 10px; }
+.observability code { font-size: var(--article-size); }
+.observability .code-sample { display: block; margin: 14px 0; padding: 20px; max-width: 100%; overflow: auto; border: 0; border-radius: 5px; background: #101619; color: #dbe7e2; font: 12px/1.85 ui-monospace, SFMono-Regular, Menlo, monospace; tab-size: 2; }
+.observability .code-sample code { font: inherit; color: inherit; overflow-wrap: normal; }
+
+.observability .mermaid-figure { margin: 20px 0; }
+.observability .mermaid-scroll { max-width: 100%; overflow: auto; padding: 14px; }
+.observability .mermaid-figure img { width: var(--diagram-width); max-width: none; height: auto; margin-inline: auto; }
+.observability img[src*="deployment-topology"] { --diagram-width: 780.801px; }
+.observability img[src*="request-sequence"] { --diagram-width: 1540px; }
+.observability img[src*="collector-pipelines"] { --diagram-width: 1381.438px; }
+.observability img[src*="failure-investigation"] { --diagram-width: 552px; }
+.observability .source-link { text-decoration: underline; text-underline-offset: 3px; }
+.observability .elastic-chart { margin: 20px 0; }
+.observability .chart-scroll { max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; padding: 14px; background: var(--panel); }
+.observability .chart-scroll:focus-visible { outline: 2px solid var(--mint); outline-offset: 4px; }
+.observability .error-trend { display: block; width: 680px; min-width: 680px; max-width: none; height: 340px; margin-inline: auto; color: var(--muted); }
+.observability .error-trend text { fill: currentColor; font: 12px Arial, sans-serif; }
+.observability .chart-grid { fill: none; stroke: var(--line); }
+.observability .chart-axis { fill: none; stroke: currentColor; }
+.observability .chart-series { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.observability .chart-profile { stroke: var(--mint); }
+.observability .chart-user { stroke: #e3af6b; stroke-dasharray: 8 5; }
+.observability .chart-web { stroke: #9bbcf2; stroke-dasharray: 2 5; }
+.observability .elastic-chart figcaption { margin-top: 10px; }
+html[data-portfolio-theme="light"] .observability .chart-user { stroke: #925615; }
+html[data-portfolio-theme="light"] .observability .chart-web { stroke: #385ba8; }
+html[data-portfolio-theme="light"] .observability { --panel: #fbfaf7; --line: #cbd6d1; --muted: #4d5c57; --mint: #17624c; }
+html[data-portfolio-theme="light"] .observability pre.code-sample,
+html[data-portfolio-theme="light"] .observability pre.code-sample code { background: #1b2023 !important; color: #dbe7e2 !important; }
+@media (max-width: 480px) {
+  .observability .article-tabs { gap: 8px 18px; }
+  .observability .code-sample { padding: 14px; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .observability .code-sample code { overflow-wrap: anywhere; }
+}
+@media print { .observability .tab-panel { display: block !important; } }

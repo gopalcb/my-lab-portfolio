@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Multi-agent work process</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / MULTI-AGENT WORK PROCESS</h1>
+<p class="lede">How an opt-in local plugin turns bounded assignments into durable results, with clear limits on what launch and completion actually prove.</p></header>
+<aside class="notice"><strong>EXISTING LOCAL PLUGIN · SOURCE REVIEW</strong><p>codex-multi-agent contains messaging, lifecycle hooks and supervised CLI workers. Installation metadata records multi-agent@gb-multi-agent version 0.1.0 with a profile hook bridge. This note does not establish current hook trust, an active scope or a successful live agent run.</p></aside>
+<section><h2>Start with explicit intent</h2>
+<p>Collaboration begins when a prompt starts with <code>/multi-agent</code> followed by task text. Ordinary prompts retain the regular workflow; an ordinary follow-up closes the previous collaboration scope. This distinction separates native delegation from the optional messaging service. Spawning an agent does not itself deliver an inbox assignment.</p>
+<p>Installation prepares the environment and plugin bundle. Trust is a separate native review step. Activation is a third step, established by the lifecycle hook supplying a registered agent ID. A receipt or an enabled plugin is insufficient evidence that all three happened. The project documents a CLI 0.163.0 compatibility bridge because bundled handlers were not exposed in that client.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="multi-agent-work-process-gate-title">
+<p class="diagram-title" id="multi-agent-work-process-gate-title">Installation, trust and activation are separate gates</p>
+<section class="diagram-group"><h3 class="diagram-label">Preparation</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Install plugin</strong><span>Bundle + dedicated profile environment</span>
+</li>
+<li class="diagram-node">
+<strong>Review handlers</strong><span>Native hook trust remains required</span>
+</li>
+<li class="diagram-node">
+<strong>Submit initial prompt</strong><span>Leading /multi-agent plus task</span>
+</li>
+</ol></section>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Activation</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Hook bootstrap</strong><span>Resolve profile and prepared interpreter</span>
+</li>
+<li class="diagram-node">
+<strong>Local service</strong><span>Singleton loopback Flask / Waitress</span>
+</li>
+<li class="diagram-node">
+<strong>Registered root</strong><span>New scope and assigned agent ID</span>
+</li>
+</ol></section>
+<p class="diagram-note">The documented CLI composer can reject the custom slash command before hooks; use a supported initial-prompt path. Do not infer activation from installation.</p>
+</div>
+<figcaption>Installation, trust and activation are separate gates.</figcaption></figure><p>The standard-library bootstrap keeps unrelated ordinary callbacks out of the heavy runtime. For activation, profile-selected dependencies load the service. SQLAlchemy and SQLite store identities, presence and events. Runtime data lives outside source and plugin cache, allowing code updates without replacing collaboration history. The client reads the allocated loopback port and bypasses proxies; authenticated calls carry agent credentials rather than browser-held tokens.</p></section>
+<section><h2>Assign ownership before work</h2>
+<p>The coordinator defines a bounded result, owned files, acceptance criteria, constraints and required evidence. Other agents may be editing nearby files, so each worker preserves unrelated changes and avoids expanding its ownership. A review agent can be read only. Task messages supply work context; they cannot override the user’s permissions or project instructions.</p>
+<p>The root and its children have distinct service identities inside the same scope. An authenticated sender addresses a registered recipient with <code>assign_task</code>. The durable event is stored before the recipient claims it. Reusing an event ID with identical content returns the existing event; changing its content conflicts. That protects message submission retries, rather than guaranteeing exactly-once external effects.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="multi-agent-work-process-inbox-title">
+<p class="diagram-title" id="multi-agent-work-process-inbox-title">The inbox records the work contract</p>
+<section class="diagram-group"><h3 class="diagram-label">Assignment lifecycle</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Queued</strong><span>Authenticated sender → scoped recipient</span>
+</li>
+<li class="diagram-node">
+<strong>Claimed</strong><span>Atomic claim; competing claim gets conflict</span>
+</li>
+<li class="diagram-node">
+<strong>Completed or failed</strong><span>Recipient persists structured result</span>
+</li>
+</ol></section>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Coordinator review</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Read result</strong><span>Match result to event and owned scope</span>
+</li>
+<li class="diagram-node">
+<strong>Inspect changes</strong><span>Check evidence and unresolved limitations</span>
+</li>
+<li class="diagram-node">
+<strong>Integrate</strong><span>Accept only reviewed work</span>
+</li>
+</ol></section>
+<p class="diagram-note">Native queue notification is optional and best effort. Queue acceptance does not prove wake-up, claim, completion or correctness.</p>
+</div>
+<figcaption>The inbox records the work contract.</figcaption></figure><p>The supported client exposes <code>inbox</code>, <code>claim</code>, <code>result</code> and <code>events</code>. A result should distinguish changed artifacts, checks actually executed and unverified assumptions. A completed event records the recipient’s report; the coordinator still inspects the resulting files and checks the acceptance evidence.</p></section>
+<section><h2>Use supervised CLI workers deliberately</h2>
+<p>A <code>launch_agent</code> event targets reserved recipient <code>system</code>. The dispatcher validates a nonempty bounded prompt, a workspace inside the initiating directory, and mode <code>process</code> or <code>terminal</code>. It enforces at most three live external workers per scope and writes a private job receipt before launching the supervisor.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="multi-agent-work-process-workers-title">
+<p class="diagram-title" id="multi-agent-work-process-workers-title">One dispatch contract, two execution modes</p>
+<section class="diagram-group"><h3 class="diagram-label">Process mode</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Supervisor</strong><span>Owned subprocess and heartbeat</span>
+</li>
+<li class="diagram-node">
+<strong>codex exec</strong><span>Fixed arguments; task follows --</span>
+</li>
+</ol></section>
+<div class="diagram-divider" aria-hidden="true">Alternatives</div>
+<section class="diagram-group"><h3 class="diagram-label">macOS Terminal mode</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Terminal runner</strong><span>Escaped fixed supervisor command</span>
+</li>
+<li class="diagram-node">
+<strong>Same supervisor</strong><span>Tracks worker and scope lifecycle</span>
+</li>
+</ol></section>
+<p class="diagram-note">These are alternative launch modes. A completed launch event proves launch handling, while a later linked completion reports worker outcome; output still needs review.</p>
+</div>
+<figcaption>One dispatch contract, two execution modes.</figcaption></figure><p>Task text remains an argument rather than executable shell syntax. The supervisor observes scope/worker state, heartbeats and terminates inactive work. A successful dispatcher response cannot prove a model solved the assigned task. Likewise, local unit tests cannot establish native hook trust, a real Terminal launch or reliable queue notification on a particular client.</p></section>
+<section><h2>Reconcile failure without duplicating effects</h2>
+<p>Presence uses starting, working, idle, stopped and offline. Heartbeats prove liveness and preserve the existing state; they do not turn idle into working. The service sweeps every ten seconds with a sixty-second stale threshold. Supervised workers have their own heartbeat loop. An unowned quiet client can expire, so presence is a lease rather than proof of useful progress.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="multi-agent-work-process-recovery-title">
+<p class="diagram-title" id="multi-agent-work-process-recovery-title">Closure and recovery preserve evidence</p>
+<section class="diagram-group"><h3 class="diagram-label">Normal closure</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Ordinary follow-up or session end</strong><span>Stop the collaboration scope</span>
+</li>
+<li class="diagram-node">
+<strong>Descendants stop</strong><span>Parent closure cascades</span>
+</li>
+<li class="diagram-node">
+<strong>Idle service exits</strong><span>After all scopes become inactive</span>
+</li>
+</ol></section>
+<div class="diagram-divider" aria-hidden="true">Alternative recovery path</div>
+<section class="diagram-group"><h3 class="diagram-label">Failure investigation</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Inspect persisted event</strong><span>Queued versus claimed versus terminal</span>
+</li>
+<li class="diagram-node">
+<strong>Reconcile attachment</strong><span>Old run cannot revive stopped presence</span>
+</li>
+<li class="diagram-node">
+<strong>Resolve uncertain launch</strong><span>Check outcome before issuing new work</span>
+</li>
+</ol></section>
+<p class="diagram-note">Queued messages survive restart. Already-claimed launches with uncertain effects are not blindly replayed; a timeout alone does not establish service death.</p>
+</div>
+<figcaption>Closure and recovery preserve evidence.</figcaption></figure><p>A practical source-based walkthrough is to request a read-only parser review with an explicitly named file boundary, wait for the hook-assigned identities, then send the child an assignment. The child reads its inbox, claims that event, reviews only the assigned scope and returns findings with inspected paths. The coordinator reads the persisted result and verifies the findings before acting. These steps describe the implementation contract, not a run performed while preparing this article.</p>
+<p>If delivery appears stuck, first distinguish absent activation, queued work, a claimed task and a completed launch awaiting child completion. Preserve private receipts and event history for an authorized investigation. Avoid replacing state, relaunching uncertain workers or treating a notification failure as lost durable work. Finish by recording reviewed outcomes and stopping the scope through its supported lifecycle.</p></section>
+<footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

@@ -1,0 +1,11 @@
+flowchart LR
+    Start[Task] --> Branch{Simple or complex?}
+    Branch -->|Simple| Small[Answer or edit]
+    Branch -->|Complex| Outcome[Agree outcome + criteria]
+    Outcome --> Tasks[Bounded tasks]
+    Tasks --> Implement[Implement]
+    Implement --> Validate{Criteria pass?}
+    Validate -->|No| Fix[Focused fix]
+    Fix --> Validate
+    Validate -->|Yes| Close[Save useful context]
+    Close --> Next[Review or next request]

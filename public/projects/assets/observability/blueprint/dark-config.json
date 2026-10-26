@@ -1,0 +1,39 @@
+{
+  "theme": "base",
+  "themeVariables": {
+    "fontFamily": "Arial, sans-serif",
+    "fontSize": "12px",
+    "primaryColor": "#1b272c",
+    "primaryTextColor": "#e5ece8",
+    "primaryBorderColor": "#638378",
+    "lineColor": "#9de8cc",
+    "secondaryColor": "#202d32",
+    "tertiaryColor": "#171f23",
+    "clusterBkg": "#171f23",
+    "clusterBorder": "#486057",
+    "edgeLabelBackground": "#171f23",
+    "actorBkg": "#1b272c",
+    "actorTextColor": "#e5ece8",
+    "actorBorder": "#638378",
+    "signalColor": "#9de8cc",
+    "signalTextColor": "#e5ece8",
+    "labelBoxBkgColor": "#202d32",
+    "labelTextColor": "#e5ece8",
+    "noteBkgColor": "#202d32",
+    "noteTextColor": "#e5ece8"
+  },
+  "flowchart": {
+    "htmlLabels": false,
+    "curve": "linear",
+    "nodeSpacing": 25,
+    "rankSpacing": 35
+  },
+  "sequence": {
+    "actorFontSize": 12,
+    "messageFontSize": 12,
+    "noteFontSize": 12,
+    "diagramMarginX": 12,
+    "diagramMarginY": 12
+  },
+  "themeCSS": ".label, .nodeLabel, .edgeLabel, .cluster-label, .messageText, .noteText, .loopText, .labelText, .actor { font-size: 12px !important; }"
+}

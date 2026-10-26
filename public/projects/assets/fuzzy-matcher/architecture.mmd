@@ -1,0 +1,17 @@
+flowchart LR
+    G[GitHub trusted release] -->|OIDC| D[Scoped AWS deployment roles]
+    D -->|immutable upload| A[S3 release artifacts]
+    D -->|Terraform workload apply| J[Glue Spark job]
+    O[Authorized operator] -->|snapshot manifests and profile| J
+    A -->|launcher and wheel bundle| J
+    I[S3 input snapshot] -->|read only| J
+    R[S3 reference snapshot] -->|read only| J
+    K[KMS keys and policies] -.-> A
+    K -.-> J
+    J -->|unique attempt outputs| S[S3 decisions candidates quarantine]
+    J -->|conditional publish last| M[S3 committed manifest]
+    M --> C[Authorized consumer]
+    S -->|only paths named in manifest| C
+    J --> L[CloudWatch logs and metrics]
+    J -->|state change| E[EventBridge failure rule]
+    E --> N[SNS operations notification]

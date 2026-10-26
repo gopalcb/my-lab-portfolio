@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A staged blueprint for application correctness, Terraform foundations, digest-based delivery and recoverable releases.">
+<title>Build, delivery and Linux</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / BUILD, DELIVERY AND LINUX</h1>
+<p class="lede">From Terraform and image delivery to the Linux foundations needed to operate the cluster.</p></header><aside class="notice"><strong>PLANNED LAB · DOCUMENTATION ONLY</strong><p>The repository contains plans and drill guides. Application code, Terraform, CI and deployed EKS resources are not built yet. Diagrams show the target; commands and outcomes are examples, not recorded results.</p></aside><section id="ownership"><h2>Ownership and delivery gates</h2>
+<p class="resource-context">Use infra/envs/learning for the first cloud roots; charts/registration declares both the registration API and its outbox publisher.</p>
+<p>Prove application correctness and repeatability first. Add cloud infrastructure, delivery automation and operating complexity only after the preceding layer has evidence.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="implementation-and-delivery-resource-ownership-title">
+<p class="diagram-title" id="implementation-and-delivery-resource-ownership-title">One writer for each EventHub resource</p>
+<section class="diagram-group"><h3 class="diagram-label">Cloud foundations</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>infra/envs/learning</strong><span>Terraform-reviewed roots</span>
+</li>
+<li class="diagram-node">
+<strong>AWS infrastructure</strong><span>VPC, EKS, ECR, RDS, SNS/SQS, buckets</span>
+</li>
+<li class="diagram-node">
+<strong>Connected bootstrap</strong><span>Private API reachability</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">In-cluster delivery</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Bootstrap Helm</strong><span>Install Argo CD in argocd</span>
+</li>
+<li class="diagram-node">
+<strong>Argo EventHub application</strong><span>Render approved platform + application charts</span>
+</li>
+<li class="diagram-node">
+<strong>EventHub Kubernetes objects</strong><span>Controllers own their derived AWS objects</span>
+</li>
+</ol></section><p class="diagram-note">Terraform owns cloud roots/add-on versions/IAM. Argo owns designated Kubernetes objects. NGINX and AWS LBC retain their generated-resource lifecycle and cleanup boundaries.</p>
+</div>
+<figcaption>EventHub target design · One writer for each EventHub resource.</figcaption></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Stage / owner</th>
+<th scope="col">Proposed deliverable</th>
+<th scope="col">Gate</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Learner / scope</td>
+<td>Versions, budget, threat model and Linux/container labs</td>
+<td>Account/region selected; support set compatible</td>
+</tr>
+<tr>
+<td>Application engineer</td>
+<td>Identity/registration vertical slice, then workers and monitor</td>
+<td>Tenant denials, race/idempotency/crash tests</td>
+</tr>
+<tr>
+<td>Terraform / infrastructure</td>
+<td>State, VPC, EKS, IAM, ECR, RDS and storage</td>
+<td>Private access, IP headroom and second no-change plan</td>
+</tr>
+<tr>
+<td>Connected operator / bootstrap</td>
+<td>Pinned controllers, CRDs and Argo installation</td>
+<td>API reachability, CRD-before-CR ordering and owner handoff</td>
+</tr>
+<tr>
+<td>GitOps / environment reviewer</td>
+<td>Charts, application digests, routes and policies</td>
+<td>Reconcile, compatible revert and negative trust tests</td>
+</tr>
+<tr>
+<td>Platform operator</td>
+<td>Signals, scaling, recovery and cleanup</td>
+<td>Measured behavior, cost and restoration</td>
+</tr>
+</tbody>
+</table></div>
+<p>Separate cloud cluster creation from in-cluster provider stages. Otherwise provider initialization may require an API that does not exist, and destroy can remove access before controller-owned resources are deleted. Pin providers, EKS/add-ons, charts and APIs as a compatible set. A Kubernetes minor alone is not a platform version.</p></section><section id="terraform"><h2>Terraform foundations and state</h2>
+<p class="resource-context">The EventHub learning environment owns its network, EKS, ECR, RDS and message resources. Bootstrap protected state separately.</p>
+<p>The target design bootstraps a dedicated encrypted, versioned, access-restricted S3 state backend separately from disposable environments. State can contain sensitive values even if terminal output hides them. Compatible Terraform supports native S3 lockfiles through <code>use_lockfile = true</code>; concurrency and lock ownership need an actual test. </p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Run only once the planned EventHub Terraform roots exist.</span>
+terraform -chdir=infra/envs/learning fmt -check -recursive
+terraform -chdir=infra/envs/learning init -backend=<span class="token keyword">false</span>
+terraform -chdir=infra/envs/learning validate
+<span class="token comment"># Expected local proof: formatting/schema validity, not AWS readiness.</span></code></pre></div>
+<p>Before an authorized dev apply, establish AWS identity/profile/region, quotas, supported versions, budget and ownership. Review the plan for broad IAM, public reachability, unexpected deletion and recurring charges. A later authenticated no-change plan demonstrates convergence, not application availability. Never force-unlock an active run or delete an unknown ENI to make cleanup appear successful.</p>
+<p>EC2 managed node groups expose Linux, kubelet and containerd for learning. Keep a stable on-demand system pool before adding constrained Karpenter application pools. Record actual node/AZ/NAT/RDS topology: an affordable learning profile and the stronger reference availability profile are different claims. NAT, endpoints, telemetry and RDS can cost more than a small application’s compute.</p></section><section id="services"><h2>Application correctness first</h2>
+<p class="resource-context">Build identity-service and registration-service first, then registration-outbox-publisher, notification-service, audit-service and monitoring-agent-service.</p>
+<p>TypeScript and Fastify are the proposed HTTP/worker stack. Validate environment and incoming JSON at runtime; compile-time types do not validate an HTTP body. Define contract schemas, tenant authorization, sanitized error classes and bounded HTTP/SQL/AWS timeouts. Registration concurrency tests need real PostgreSQL constraints/transactions, not only mocked repository calls.</p>
+<p>Startup probes allow initialization; readiness decides whether this replica should accept traffic; liveness detects a condition worth restarting. An unavailable database should not create endless liveness restart storms. On SIGTERM, stop accepting work, drain bounded in-flight requests, finish or release queue work safely, close pools and exit within the pod grace period.</p>
+<p>The small Python monitoring agent uses dedicated test tenants, scoped client credentials and bounded requests. A Deployment can run continuous checks; a CronJob needs explicit overlap and execution-deadline handling. It emits synthetic outcomes and telemetry, while node exporters and OTel collectors retain platform collection responsibilities. An outside probe is still required to observe total cluster failure independently.</p></section><section id="images"><h2>Source, image, container and socket</h2>
+<p class="resource-context">ECR eventhub/registration-service supplies one digest to two Deployments: registration-service and registration-outbox-publisher.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="implementation-and-delivery-image-runtime-boundaries-title">
+<p class="diagram-title" id="implementation-and-delivery-image-runtime-boundaries-title">The registration image becomes two workloads</p>
+<section class="diagram-group"><h3 class="diagram-label">Build the shared artifact once</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>services/registration</strong><span>Source + lockfile; planned build root</span>
+</li>
+<li class="diagram-node">
+<strong>Builder → runtime image</strong><span>Compile, test; copy dist + runtime dependencies</span>
+</li>
+<li class="diagram-node">
+<strong>ECR eventhub/registration-service</strong><span>Content digest + architecture + provenance</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Two entrypoints · parallel Deployments</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>registration-service</strong><span>Container registration · node dist/server.js · port 3000</span>
+</li>
+<li class="diagram-node">
+<strong>registration-outbox-publisher</strong><span>Container outbox-publisher · node dist/outbox-publisher.js</span>
+</li>
+</ul></section><p class="diagram-note">Kubelet/containerd pull the same digest and launch separate constrained processes. Both share their worker’s Linux kernel; each container has its own resource budget. The worker exposes no public API.</p>
+</div>
+<figcaption>EventHub target design · The registration image becomes two workloads.</figcaption></figure><p>A multi-stage Docker build keeps compilers and test tools out of the final image. Use selected, supported base images pinned to digests and a dependency lockfile. Install production dependencies without baking credentials into layers. A non-root runtime, exec-form entrypoint and minimal required files help, but image size is not artifact provenance. </p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="DOCKERFILE"><code class="language-dockerfile"><span class="token comment"># Proposed services/registration/Dockerfile.</span>
+<span class="token comment"># CI must supply approved digest-pinned Node builder/runtime references.</span>
+<span class="token keyword">ARG</span> BUILD_IMAGE
+<span class="token keyword">ARG</span> RUNTIME_IMAGE
+<span class="token keyword">FROM</span> ${BUILD_IMAGE} <span class="token keyword">AS</span> build
+<span class="token keyword">WORKDIR</span> /app
+<span class="token keyword">COPY</span> package.json package-lock.json ./
+<span class="token keyword">RUN</span> npm ci
+<span class="token keyword">COPY</span> . .
+<span class="token keyword">RUN</span> npm run build
+<span class="token keyword">RUN</span> npm prune --omit=dev
+
+<span class="token keyword">FROM</span> ${RUNTIME_IMAGE} <span class="token keyword">AS</span> runtime
+<span class="token keyword">WORKDIR</span> /app
+<span class="token keyword">COPY</span> --from=build --chown=<span class="token number">10001</span>:<span class="token number">10001</span> /app/dist ./dist
+<span class="token keyword">COPY</span> --from=build --chown=<span class="token number">10001</span>:<span class="token number">10001</span> /app/node_modules ./node_modules
+<span class="token keyword">COPY</span> --from=build --chown=<span class="token number">10001</span>:<span class="token number">10001</span> /app/package.json ./package.json
+<span class="token keyword">USER</span> <span class="token number">10001</span>:<span class="token number">10001</span>
+<span class="token keyword">EXPOSE</span> <span class="token number">3000</span>
+<span class="token keyword">CMD</span> [<span class="token string">"node"</span>, <span class="token string">"dist/server.js"</span>]
+<span class="token comment"># Publisher Deployment overrides command with:</span>
+<span class="token comment"># ["node", "dist/outbox-publisher.js"]</span></code></pre></div>
+<p>The sketch assumes future package files/build scripts, a suitable Node runtime, required trust roots and a .dockerignore that excludes credentials and build junk. Verify native dependency architecture/libc, module layout and writable scratch paths. No such Dockerfile or image build exists today.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Environment</th>
+<th scope="col">localhost means</th>
+<th scope="col">How requests arrive</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Host process</td>
+<td>The host network namespace</td>
+<td>Host interface/socket and host firewall</td>
+</tr>
+<tr>
+<td>Typical Docker bridge container</td>
+<td>That container’s namespace</td>
+<td>Published host port forwards to container; EXPOSE alone publishes nothing</td>
+</tr>
+<tr>
+<td>Kubernetes pod</td>
+<td>Network namespace shared by containers in that pod</td>
+<td>Pod IP, Service/gateway and policy; containerPort is descriptive</td>
+</tr>
+<tr>
+<td>hostNetwork pod</td>
+<td>The node’s namespace</td>
+<td>Different isolation/port collision implications; not the application default</td>
+</tr>
+</tbody>
+</table></div>
+<p>A process listening only on 127.0.0.1 can pass an in-container test yet fail Service traffic to its pod IP. Containers in one pod share localhost; separate pods do not. On macOS, Docker/kind normally runs through a Linux VM, so the laptop’s kernel observations do not directly describe an EC2 worker.</p></section><section id="ci"><h2>Build once, promote the digest</h2>
+<p class="resource-context">The registration image is tested once and promoted through environment values; the publisher reuses that same artifact.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="implementation-and-delivery-ci-gitops-promotion-title">
+<p class="diagram-title" id="implementation-and-delivery-ci-gitops-promotion-title">Source revision to a verified EventHub release</p>
+<section class="diagram-group"><h3 class="diagram-label">Build and publish</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>GitHub checks</strong><span>Typecheck, contracts, PostgreSQL race tests</span>
+</li>
+<li class="diagram-node">
+<strong>One registration image</strong><span>Scan, SBOM, provenance and trust policy</span>
+</li>
+<li class="diagram-node">
+<strong>eventhub/registration-service</strong><span>Scoped OIDC publish → immutable digest</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Promote and verify</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Environment PR</strong><span>Same digest in registration values; no rebuild</span>
+</li>
+<li class="diagram-node">
+<strong>Argo CD</strong><span>Reconcile API + publisher Deployments</span>
+</li>
+<li class="diagram-node">
+<strong>EventHub release check</strong><span>HTTPS registration, both workers, denied tenant</span>
+</li>
+</ol></section><p class="diagram-note">Image-pull permissions belong to the node path; workload Pod Identity is separate. CI does not need direct access to the private Kubernetes API to propose a GitOps change.</p>
+</div>
+<figcaption>EventHub target design · Source revision to a verified EventHub release.</figcaption></figure><p>GitHub Actions OIDC exchanges a workflow token for short-lived AWS credentials. Restrict the role’s audience and subject to the intended repository and branch or protected environment; prove an unauthorized subject fails. Use minimum workflow permissions and reviewed/pinned action dependencies. Avoid static AWS keys in CI. </p>
+<p>The proposed pipeline layers lint/typecheck, unit/contract tests, PostgreSQL integration/race tests, image build, image/IaC/chart scans, SBOM, provenance and signatures/attestations. Admission then verifies the selected deployment trust policy. An authorized publisher can still publish an unsafe artifact; ECR scanning alone is not a software-supply-chain policy. Findings require exploitability review and expiring exceptions.</p>
+<ul>
+<li>Use immutable tags to reduce replacement mistakes and digests to identify exact content. Promote the same digest across environments.</li>
+<li>Record the source revision, builder identity, target architecture and verification policy.</li>
+<li>Test a replacement node’s cold image pull: ECR/DKR/S3 reachability and node permissions must work. Application Pod Identity does not authorize kubelet image pulls.</li>
+</ul></section><section id="gitops"><h2>Helm, Argo CD and private bootstrap</h2>
+<p class="resource-context">Argo reconciles the EventHub charts from approved Git state. It does not share ownership of those resources with direct CI kubectl releases.</p>
+<p>A service chart should present a small values interface with schema validation, intended resources/probes, identities and no secret payloads in render output. Lint and render locally, validate against selected Kubernetes schemas, then test server admission in the connected dev cluster. CRDs precede custom resources; controller readiness and migration ordering are explicit dependencies.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Planned EventHub chart/values paths; not present yet.</span>
+helm lint charts/registration
+helm template registration charts/registration \
+  --namespace apps-dev -f environments/dev/registration.yaml
+<span class="token comment"># Assert registration-service + registration-outbox-publisher Deployments,</span>
+<span class="token comment"># named containers, same digest, separate service accounts and correct probes.</span>
+<span class="token comment"># Assert registration-service port80 -&gt; named http target3000.</span></code></pre></div>
+<p>Argo CD uses Helm to render manifests and owns their lifecycle. Do not also run routine helm upgrades for Argo-owned resources. Bootstrap Helm owns the Argo installation; Terraform retains AWS infrastructure, declared add-on versions and IAM associations. Emergency live changes must return to desired state deliberately. Argo CD’s Helm integration explains the renderer/reconciler distinction.</p>
+<p>A public GitHub-hosted runner cannot reach a private Kubernetes API just because it can assume an AWS role. CI can publish images and propose Git changes without API access; in-cluster Argo needs reachable Git/chart/registry sources. Initial installation and recovery still require a connected runner, VPN or reviewed SSM access path. DNS, routing, SG rules, trust and access entries must all work.</p>
+<p>The plan includes a bounded F5 NGINX Ingress Controller exercise for the first release, then migration to the target NGINX Gateway Fabric path. Verify host/path/TLS/denial parity before switching. Add Istio only after edge networking works; gateway APIs, annotations and client-certificate support require exact-version checks, not assumptions transferred between NGINX projects.</p></section><section id="schema"><h2>Migrations and rollback</h2>
+<p class="resource-context">The registration migration Job changes the registration schema under one owner; API and publisher versions must remain compatible.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="implementation-and-delivery-schema-compatibility-title">
+<p class="diagram-title" id="implementation-and-delivery-schema-compatibility-title">Change the registration schema without losing rollback</p>
+<section class="diagram-group"><h3 class="diagram-label">Expand and migrate</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>registration migration Job</strong><span>Add compatible schema; one migration owner</span>
+</li>
+<li class="diagram-node">
+<strong>Old + new registration replicas</strong><span>Both operate within the compatibility window</span>
+</li>
+<li class="diagram-node">
+<strong>Bounded backfill</strong><span>Verify row counts, locks, latency and events</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Evidence before removing compatibility</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Compatibility check</strong><span>HTTP/API, outbox and consumer contracts</span>
+</li>
+<li class="diagram-node">
+<strong>Reviewed owner decision</strong><span>Keep rollback window open, or close it explicitly</span>
+</li>
+<li class="diagram-node">
+<strong>Contract later</strong><span>Remove obsolete use only after proof</span>
+</li>
+</ol></section><p class="diagram-note">A Git revert can restore a compatible image digest. It cannot undo changed data. Incompatible state requires a reviewed forward repair or restore plus outbox/queue reconciliation.</p>
+</div>
+<figcaption>EventHub target design · Change the registration schema without losing rollback.</figcaption></figure><p>Choose one migration Job owner and explicit retry/concurrency rules. A Job is not automatically safe to rerun after partial failure. Expand/contract lets old/new application versions coexist, bounds lock/query impact and defers destructive contraction until old readers are gone. Validate backfill counts and constraints; do not infer success from Job completion alone.</p>
+<p>Revert the application digest through Git only if its schema and event contracts remain compatible. Otherwise choose the reviewed forward repair or recovery path. Queue messages outlive releases, so consumers must handle declared event versions through the compatibility window. A PostgreSQL restore must reconcile outbox rows, already-published messages, audit objects and external side effects. Helm rollback cannot undo arbitrary data migration.</p></section><section id="linux-scope"><h2>Linux: choose the observation scope</h2>
+<p class="resource-context">For a slow registration, first identify its apps-dev pod and worker. A worker shell and a registration container expose different namespaces and counters.</p>
+<p>Kubernetes ultimately runs Linux processes, sockets and files under resource and security controls. The proposed EventHub lab begins in a Linux VM, then uses AL2023 EC2 workers on EKS. macOS is the workstation, not the node kernel. kind nodes are containers sharing the underlying Linux VM’s kernel. Measurements from those environments must remain labeled separately.</p>
+<p>EKS manages its control-plane hosts. You can inspect Kubernetes API state, control-plane/audit logs and AWS events; you cannot assume SSH access to its etcd or API-server hosts. A separate disposable kubeadm cluster is the planned place to practice host-level control-plane recovery. No such lab or EKS resource has been built for this repository.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="linux-essentials-runtime-control-boundaries-title">
+<p class="diagram-title" id="linux-essentials-runtime-control-boundaries-title">Who runs the registration process?</p>
+<section class="diagram-group"><h3 class="diagram-label">Desired workload to a Linux process</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>EKS Kubernetes API</strong><span>Desired apps-dev/registration-service state</span>
+</li>
+<li class="diagram-node">
+<strong>Worker kubelet → containerd</strong><span>systemd supervises host services; CRI starts container</span>
+</li>
+<li class="diagram-node">
+<strong>registration container</strong><span>Exec-form Node.js PID1; HTTP on 3000</span>
+</li>
+</ol></section><div class="diagram-divider" aria-hidden="true"></div>
+<section class="diagram-group"><h3 class="diagram-label">The process has multiple boundaries</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Pod network namespace</strong><span>eth0, loopback, sockets and routes</span>
+</li>
+<li class="diagram-node">
+<strong>Container cgroup</strong><span>CPU, memory, PID accounting/limits</span>
+</li>
+<li class="diagram-node">
+<strong>Mount + user view</strong><span>/app, UID10001 and bounded scratch</span>
+</li>
+</ul></section><p class="diagram-note">Inspect EKS control-plane evidence through supported APIs/logs. Node SSH/SSM applies to authorized workers, not managed EKS etcd hosts. Host PIDs differ from container PID1.</p>
+</div>
+<figcaption>EventHub target design · Who runs the registration process?.</figcaption></figure></section><section id="linux-process"><h2>Linux: processes and graceful shutdown</h2>
+<p class="resource-context">The registration container starts node dist/server.js as PID1; the publisher starts node dist/outbox-publisher.js in its own container.</p>
+<p>A process has a PID, parent, credentials, file descriptors and threads. The process tree helps distinguish a service manager, runtime shim, shell wrapper and application. A zombie has exited but still needs its parent to reap its status; it is not consuming CPU as a running worker. Too many processes or unreaped children can still exhaust a PID budget.</p>
+<p>systemd supervises host services such as kubelet and containerd through units and dependency relationships. A typical app container directly runs its application rather than booting a whole systemd host. AL2023 boot uses nodeadm configuration for EKS setup; node readiness then depends on kubelet/runtime, network and API access. Unit status and the journal help locate the failed stage. </p>
+<p>SIGTERM gives an application an opportunity to shut down; SIGKILL cannot be caught. PID-namespace init has special signal behavior, so deliberate signal handlers and child reaping matter. A shell-form entrypoint can leave a shell between the runtime and application without correct forwarding. Prefer an exec-form application entrypoint or a suitable minimal init when it must manage children. </p>
+<figure><div class="system-diagram" role="group" aria-labelledby="linux-essentials-graceful-termination-title">
+<p class="diagram-title" id="linux-essentials-graceful-termination-title">Drain EventHub HTTP and queue work</p>
+<section class="diagram-group"><h3 class="diagram-label">Concurrent termination paths · one grace budget</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Pod termination begins</strong><span>kubelet grace clock starts; optional preStop consumes it</span>
+</li>
+<li class="diagram-node">
+<strong>Readiness/endpoints change</strong><span>Route updates propagate concurrently</span>
+</li>
+<li class="diagram-node">
+<strong>TERM reaches application</strong><span>Exec-form PID1 handles bounded shutdown</span>
+</li>
+</ul></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Different workload shutdown paths · parallel</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>registration-service</strong><span>Stop new requests; drain bounded in-flight HTTP; close DB pool</span>
+</li>
+<li class="diagram-node">
+<strong>notification-service</strong><span>Stop receiving; finish durable work then ack, or allow safe retry</span>
+</li>
+</ul></section><p class="diagram-note">Endpoint changes and draining are not atomic. Grace deadline may lead to forced KILL. Test in-flight registration correctness and duplicate-safe notification redelivery.</p>
+</div>
+<figcaption>EventHub target design · Drain EventHub HTTP and queue work.</figcaption></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Future registration container: exec-form application is PID1.</span>
+<span class="token comment"># The short-lived node -e process reads PID1; it is not the server process.</span>
+kubectl -n apps-dev exec deploy/registration-service -c registration -- \
+  node -e <span class="token string">'const fs=require("node:fs"); for(const f of ["status","limits"]) console.log(fs.readFileSync("/proc/1/"+f,"utf8"))'</span>
+<span class="token comment"># Resolve its worker separately; use approved worker access for systemd/journal.</span>
+kubectl -n apps-dev get pods \
+  -l app.kubernetes.io/name=registration-service -o wide</code></pre></div>
+<p>The future registration service should stop new HTTP work, drain bounded requests and close database pools; a queue worker must finish or safely relinquish visibility before exit. Kubernetes readiness propagation and grace termination must be tested under load. A successful process restart does not prove no registrations were lost. Kubernetes pod lifecycle describes the termination sequence.</p></section><section id="linux-files"><h2>Linux: storage and permissions</h2>
+<p class="resource-context">The registration runtime uses /app, UID10001 and bounded writable scratch. Inspect those mounts before changing file permissions.</p>
+<p>A pathname resolves through directories and mounts in the process’s mount namespace. The same path on host and container can name different content. A mounted volume can hide files included in an image at that location. Container writable layers are not durable application storage: pod replacement can lose them. Use the planned RDS boundary for application data and explicit volumes for storage exercises.</p>
+<p>Overlay filesystems combine lower content with an upper writable layer; changes can involve copying data upward. A log growing in that layer consumes node storage. Deleting a file does not immediately free its space if a process still holds it open. Bytes and inodes are different capacities: millions of tiny files can exhaust inodes with plenty of bytes left. </p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Observation</th>
+<th scope="col">Meaning to test</th>
+<th scope="col">Safe next step</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Permission denied</td>
+<td>Effective UID/GID, parent traversal, mode/ACL or security policy mismatch</td>
+<td>Inspect id/stat/path components before choosing an owner/mode correction</td>
+</tr>
+<tr>
+<td>Read-only filesystem</td>
+<td>The intended mount or root filesystem disallows writes</td>
+<td>Identify configured scratch/volume path; preserve non-root/read-only app design</td>
+</tr>
+<tr>
+<td>No space left</td>
+<td>Bytes or inodes exhausted in the actual backing filesystem</td>
+<td>Compare df -h and df -i; inspect bounded log/image growth</td>
+</tr>
+<tr>
+<td>File missing after mount</td>
+<td>Volume hides image content or wrong path/namespace</td>
+<td>Compare mount table with chart volumeMounts</td>
+</tr>
+<tr>
+<td>Slow writes / fsync</td>
+<td>Device latency, queueing or remote/AZ/storage constraints</td>
+<td>Correlate iostat and app latency; inspect CSI/PV topology</td>
+</tr>
+</tbody>
+</table></div>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Registration container: check its own user, /app and descriptor count.</span>
+kubectl -n apps-dev exec deploy/registration-service -c registration -- \
+  node -e <span class="token string">'const fs=require("node:fs"); console.log({uid:process.getuid(),gid:process.getgid()}); console.log(fs.statSync("/app")); console.log({serverFds:fs.readdirSync("/proc/1/fd").length})'</span>
+<span class="token comment"># On the discovered registration worker, after authorized access:</span>
+findmnt
+df -h
+df -i</code></pre></div>
+<p>Permission checks apply to path components, not just the final file. A non-root user needs directory search permission to reach a readable file. Numeric IDs on mounted data must match the selected security context and storage design; a username inside one image is not a universal identity. Do not repair a mount problem with recursive world-writable permissions. </p>
+<p>The EBS CSI lab must account for volume topology, attachment and access semantics; an AZ-bound volume cannot be assumed to follow a pod anywhere. Never force a second writer by detaching a volume whose original writer may still be active. Mount/CSI evidence and data integrity tests belong together.</p></section><section id="linux-network"><h2>Linux: network diagnostics</h2>
+<p class="resource-context">Inspect monitoring’s resolver and registration’s listener separately; loopback in one pod cannot reach the other.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="linux-essentials-socket-to-remote-path-title">
+<p class="diagram-title" id="linux-essentials-socket-to-remote-path-title">A monitoring probe reaches registration</p>
+<section class="diagram-group"><h3 class="diagram-label">Namespace-local decisions</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>monitoring-agent process</strong><span>Resolve registration Service through CoreDNS</span>
+</li>
+<li class="diagram-node">
+<strong>M1 network namespace</strong><span>Connect to allocated ClusterIP:80</span>
+</li>
+<li class="diagram-node">
+<strong>Worker forwarding</strong><span>kube-proxy selection; veth/ENI path to R1 or R2</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Application endpoint</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>registration pod namespace</strong><span>Packet reaches its VPC IP and port 3000</span>
+</li>
+<li class="diagram-node">
+<strong>registration Node.js listener</strong><span>0.0.0.0:3000; own process/FD budget</span>
+</li>
+<li class="diagram-node">
+<strong>HTTP health result</strong><span>/healthz confirms liveness, not a committed registration</span>
+</li>
+</ol></section><p class="diagram-note">127.0.0.1 in monitoring refers to that pod namespace, never a registration pod. Public probes use the selected API host, NLB and NGINX TLS path instead.</p>
+</div>
+<figcaption>EventHub target design · A monitoring probe reaches registration.</figcaption></figure><p>A network namespace has its own interfaces, routes, sockets and networking state. Containers in a pod share its network namespace; separate pods normally do not. A process bound to 127.0.0.1 listens only on that namespace’s loopback. A Service-forwarded request to the pod IP needs a suitable listening address. </p>
+<p>Use interface addresses and link counters to establish local state, route/rule tables to select a path, and neighbor state for the next-hop link-layer relationship. DNS lookup depends on the process’s resolver configuration and search rules. A DNS answer does not prove the destination accepts TCP. Inspect sockets for LISTEN, established connections, SYN retransmission and TIME_WAIT patterns. TCP is a byte stream; connection retries do not make a registration operation idempotent. </p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Inspect the actual monitoring pod resolver, using its existing interpreter.</span>
+kubectl -n apps-dev exec deploy/monitoring-agent-service \
+  -c monitoring-agent -- python3 -c \
+  <span class="token string">'from pathlib import Path; print(Path("/etc/resolv.conf").read_text())'</span>
+<span class="token comment"># On the worker hosting the affected registration replica, if tools exist:</span>
+ip addr
+ip route
+ip rule
+ip neigh
+ss -s
+<span class="token comment"># Host sockets/routes are not the pod namespace's sockets/routes.</span>
+<span class="token comment"># Use an approved namespace-targeted diagnostic session for pod-level ss/ip.</span></code></pre></div>
+<p>Conntrack tracks flows used by stateful forwarding and NAT; it is not an application connection pool. Table pressure, asymmetric routing or dropped return packets can appear as timeouts. Compare same-node/cross-node and small/large responses before changing a global rule. Use iptables or nftables inspection that matches the actual kube-proxy/data-plane mode.</p>
+<p>TLS adds certificate chain, hostname/SAN, SNI, trust-store and time checks after TCP. The browser→NGINX public TLS connection, NGINX→private Istio gateway server TLS, and mesh mTLS→service are distinct target hops. Encryption does not replace authorization. An authenticated wrong service principal must still be denied. Do not treat an insecure curl success as certificate verification.</p></section><section id="linux-isolation"><h2>Linux: isolation and resource limits</h2>
+<p class="resource-context">Use the affected registration container’s cgroup and namespace view, then correlate with the worker that hosts it.</p>
+<p>Namespaces control views: PID, mount, network, IPC, UTS and user identity are common examples. User namespaces can map IDs; being root inside a container does not automatically establish a harmless identity. Capabilities, seccomp, privilege escalation controls, filesystem mounts and kernel exposure still matter. A privileged host-network container has a very different threat boundary from the intended restricted app. </p>
+<p>cgroups account for and control resources; they do not provide the same isolation as namespaces. The runtime creates workload processes and mounts under the selected controls. Kubernetes kubelet talks to containerd using CRI; an OCI image is an artifact consumed by the runtime. If image pull succeeds but exec fails, inspect architecture, executable mode, interpreter/dynamic loader and entrypoint rather than assuming a registry failure.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="linux-essentials-node-cgroup-process-budgets-title">
+<p class="diagram-title" id="linux-essentials-node-cgroup-process-budgets-title">Three budgets behind a slow registration</p>
+<section class="diagram-group"><h3 class="diagram-label">Observe each scope separately</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Worker hosting R1</strong><span>Physical capacity; memory pressure, disk and inodes</span>
+</li>
+<li class="diagram-node">
+<strong>registration container cgroup</strong><span>memory.events, cpu.stat, pids.events</span>
+</li>
+<li class="diagram-node">
+<strong>registration Node.js process</strong><span>Heap, buffers, event loop, threads and FDs</span>
+</li>
+</ul></section><div class="diagram-divider" aria-hidden="true"></div>
+<section class="diagram-group"><h3 class="diagram-label">Discriminate the failure</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Worker pressure</strong><span>Kubelet eviction and node conditions</span>
+</li>
+<li class="diagram-node">
+<strong>Container cap</strong><span>OOM kill or CPU throttling despite node headroom</span>
+</li>
+<li class="diagram-node">
+<strong>Process exhaustion</strong><span>Socket/FD waits or blocking despite low aggregate CPU</span>
+</li>
+</ul></section><p class="diagram-note">Correlate one time window and the discovered registration pod/node. Raising a budget without identifying the leak or bottleneck is not a demonstrated repair.</p>
+</div>
+<figcaption>EventHub target design · Three budgets behind a slow registration.</figcaption></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Registration PID1 cgroup membership and namespace identities.</span>
+kubectl -n apps-dev exec deploy/registration-service -c registration -- \
+  node -e <span class="token string">'const fs=require("node:fs"); console.log(fs.readFileSync("/proc/1/cgroup","utf8")); for(const n of ["net","mnt","pid"]) console.log(n,fs.readlinkSync("/proc/1/ns/"+n))'</span>
+<span class="token comment"># Read the container-visible cgroup v2 files only if that mount is exposed.</span>
+kubectl -n apps-dev exec deploy/registration-service -c registration -- \
+  node -e <span class="token string">'const fs=require("node:fs"); for(const n of ["memory.events","cpu.stat","pids.events"]) { const p="/sys/fs/cgroup/"+n; if(fs.existsSync(p)) console.log(n,fs.readFileSync(p,"utf8")); else console.log(n,"not visible: resolve mount/host cgroup with approved diagnostics") }'</span> </code></pre></div>
+<p>Do not enter a host namespace simply because a command is available. nsenter, runtime inspection, packet capture and tracing can confer powerful visibility or control; use the planned isolated VM first and approved scoped node access later. Diagnostic output can include sensitive paths or metadata.</p></section><section id="linux-resources"><h2>Linux: pressure and performance</h2>
+<p class="resource-context">Compare registration PID1/cgroup pressure with its worker’s memory, disk and CPU signals over the same time window.</p>
+<p>CPU requests influence scheduling and allocation; CPU limits can throttle execution. Memory limits can cause a cgroup OOM even while the node has available RAM. Kubernetes node-pressure eviction is a different mechanism. Check termination reason, cgroup counters and node conditions together. Memory requests are not a guarantee that a leaking process will remain healthy. Kubernetes resource management defines the scheduling/enforcement split.</p>
+<p>In cgroup v2, memory events, CPU throttling and PID-limit events describe specific resource boundaries. Resolve the actual process cgroup before reading them. Increasing a limit may conceal a leak or shift the outage to the node; use measured peak and bounded workload behavior to select a repair. </p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Symptom</th>
+<th scope="col">Useful comparison</th>
+<th scope="col">Interpretation to investigate</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>High load average</td>
+<td>CPU usage, run queue, I/O wait, blocked processes</td>
+<td>Runnable CPU demand differs from uninterruptible I/O waits</td>
+</tr>
+<tr>
+<td>Low CPU but slow requests</td>
+<td>Pool waits, sockets, disk latency and event-loop state</td>
+<td>Waiting on dependencies can dominate latency</td>
+</tr>
+<tr>
+<td>Memory appears used</td>
+<td>RSS/heap, page cache, available memory and cgroup cap</td>
+<td>Cache is not automatically a leak; node free is not a container budget</td>
+</tr>
+<tr>
+<td>Latency spikes under CPU limit</td>
+<td>cpu.stat throttling and event-loop lag under same load</td>
+<td>A single event loop can stall before aggregate node CPU saturates</td>
+</tr>
+<tr>
+<td>Writes stall</td>
+<td>iostat latency/queue, PSI I/O, volume throughput/IOPS and fsync</td>
+<td>More pods may amplify a storage bottleneck</td>
+</tr>
+</tbody>
+</table></div>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Registration container evidence; avoid mistaking exec-process heap for server heap.</span>
+kubectl -n apps-dev exec deploy/registration-service -c registration -- \
+  node -e <span class="token string">'const fs=require("node:fs"); console.log(fs.readFileSync("/proc/1/status","utf8"))'</span>
+<span class="token comment"># On its discovered worker, with prepared tools and authorized access:</span>
+free -m
+vmstat <span class="token number">1</span> <span class="token number">5</span>
+iostat -xz <span class="token number">1</span> <span class="token number">5</span>
+cat /proc/pressure/cpu
+cat /proc/pressure/memory
+cat /proc/pressure/io
+<span class="token comment"># Compare host pressure with this registration container's limits/events.</span></code></pre></div>
+<p>Pressure Stall Information reports time work is stalled on CPU, memory or I/O. It supplements utilization: a device can look moderately busy while latency-sensitive work suffers. Compare PSI with the same interval’s application latency and resource counters. The kernel PSI guide describes the signal. Tools may need preparation or privilege; absence of a tool is not evidence of a healthy subsystem.</p></section><section id="linux-access"><h2>Linux: time, logs and node access</h2>
+<p class="resource-context">Resolve the registration pod’s node before opening an approved worker session. Do not attempt EKS control-plane SSH.</p>
+<p>Use UTC wall-clock timestamps to correlate systems, and monotonic durations for elapsed work where possible. Clock drift can confuse timelines, token expiry and certificate validation. Record request/trace IDs, service/version and sanitized error class. Keep bearer tokens, passwords, full request bodies and process environments out of the evidence bundle. A log collector failure can make a failing workload appear silent.</p>
+<p>Private workers need an approved access path. SSM Session Manager can provide controlled access without opening inbound SSH, but it still needs a managed node, agent, IAM permissions and service connectivity. If SSH is the selected exercise, restrict reachability and keys and verify the host identity. Neither model authorizes EKS control-plane host access. </p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell">registration_pod=$(kubectl -n apps-dev get pods \
+  -l app.kubernetes.io/name=registration-service \
+  -o jsonpath=<span class="token string">'{.items[0].metadata.name}'</span>)
+: <span class="token string">"${registration_pod:?No registration pod found}"</span>
+registration_node=$(kubectl -n apps-dev get pod <span class="token string">"$registration_pod"</span> \
+  -o jsonpath=<span class="token string">'{.spec.nodeName}'</span>)
+: <span class="token string">"${registration_node:?Pod is not scheduled}"</span>
+printf <span class="token string">'Target worker: %s\n'</span> <span class="token string">"$registration_node"</span>
+<span class="token comment"># Open only the approved worker session mapped to that node, then:</span>
+date -u
+timedatectl status
+systemctl --failed --no-pager
+journalctl -u containerd --since <span class="token string">"15 minutes ago"</span> --no-pager -n <span class="token number">100</span>
+<span class="token comment"># These are proposed diagnostics, not recorded session results.</span></code></pre></div>
+<p>A safe diagnostic sequence is: confirm host/context and time; observe process/node state; inspect the affected mount or network namespace; sample counters for a bounded interval; compare one working path; preserve sanitized evidence; choose a narrowly owned repair; repeat the original request and its denial/correctness checks. Avoid restarting first, deleting logs/runtime files, flushing firewall rules or making arbitrary limits unlimited.</p>
+<p>The planned mastery assessment asks the learner to explain why the evidence distinguishes OOM from eviction, CPU throttle from I/O wait, missing route from authorization denial and process startup from image pull. The required hands-on proof is still pending. This article supplies a map for that practice, not a claim of completed operator experience.</p></section><section id="evidence"><h2>Expected end-state evidence</h2>
+<p class="resource-context">The end result is an observed HTTPS registration, committed outbox, notification result and audit record, plus safe recovery evidence.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Bundle</th>
+<th scope="col">What must actually be recorded</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Reproduction</td>
+<td>Versions, selected dev profile/region, owner map, reviewed plan and no-change second plan</td>
+</tr>
+<tr>
+<td>Delivery</td>
+<td>CI checks, OIDC negative test, SBOM/attestation policy, running digest and cold pull</td>
+</tr>
+<tr>
+<td>Correctness</td>
+<td>Capacity race, duplicate request, consumer crash/redelivery and cross-tenant denial</td>
+</tr>
+<tr>
+<td>Operations</td>
+<td>Same-load percentiles/errors, resource/IP/pool budgets and alert→trace→log evidence</td>
+</tr>
+<tr>
+<td>Lifecycle</td>
+<td>Timed restore with RPO/RTO, supported upgrade, actual cost and cleanup inventory</td>
+</tr>
+</tbody>
+</table></div>
+<p>A finished report would connect a source revision and image digest to running private workloads, accepted routes, trusted HTTPS and a complete synthetic registration. It would show compatible revert behavior and deliberate wrong-tenant, wrong-resource and wrong-mesh-principal denials. Local rendering and scans cannot establish those cloud properties. All runtime acceptance evidence remains pending for this lab.</p></section><footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

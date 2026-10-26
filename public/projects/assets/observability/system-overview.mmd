@@ -1,0 +1,27 @@
+flowchart TB
+    B["User Browser<br/>Angular Application"]
+    S["Kubernetes Web Service"]
+
+    subgraph EKS["EKS Cluster — 1 Worker Node"]
+        direction TB
+        subgraph P1["Pod 1 — web-api"]
+            WEB["Node.js API<br/>Serves Angular Build"]
+            COL["OTel Collector Sidecar"]
+        end
+
+        subgraph P2["Pod 2 — user-service"]
+            USER["User Service"]
+        end
+
+        subgraph P3["Pod 3 — profile-service"]
+            PROFILE["Profile Service"]
+        end
+    end
+
+    DB[("PostgreSQL")]
+
+    B -->|"GET /api/users/42/profile"| S
+    S --> WEB
+    WEB -->|"GET /users/42"| USER
+    USER -->|"GET /profiles/42"| PROFILE
+    PROFILE -->|"SELECT profile"| DB

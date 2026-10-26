@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>EKS microservices lab</title>
+<link rel="stylesheet" href="../read/reading.css">
+<link rel="stylesheet" href="eks-architecture.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / EKS MICROSERVICES LAB</h1>
+<p class="lede">From an authenticated browser request to a committed registration, its HTTP response and the workers that finish the event—across AWS, Kubernetes and Linux boundaries.</p></header><aside class="notice"><strong>TARGET ARCHITECTURE · DOCUMENTATION ONLY</strong><p>The project currently contains plans and learning guides. Application code, Terraform, charts and deployed EKS resources do not exist yet. Pods, containers, placements and numbered paths below describe the system to be built, not running infrastructure.</p></aside><section id="intent"><h2>What is being built</h2>
+<p>EventHub is a tenant-aware event-registration platform. A user signs in, reads an event, and reserves a seat. The application must reject another tenant’s data, prevent two requests from selling the last seat twice, and produce independent notification and audit outcomes even when processes restart. Those business rules are the reason for the Kubernetes, networking and recovery work.</p>
+<p>The target combines TypeScript/Node.js Fastify APIs and workers, one Python synthetic monitor, private EKS workers, RDS PostgreSQL, SNS/SQS and S3. Terraform, ECR, Helm and Argo CD supply infrastructure and delivery. NGINX Gateway Fabric is the main edge target after the bounded F5 Ingress learning/migration exercise. Istio is a later security stage; it is not silently present in the baseline.</p></section><section id="landscape"><h2>The AWS landscape: subnet to running container</h2>
+<p>Read the map from the client at the top into the customer VPC. A pod is the network boundary; its application container is the running process inside it. The three AZ columns illustrate the reference replica counts from the implementation resource map. They do not guarantee that a real scheduler will create exactly this placement or that a smaller learning environment has the same availability.</p>
+<figure class="architecture-landscape"><div class="aws-landscape" role="group" aria-labelledby="landscape-title">
+<h3 class="diagram-title" id="landscape-title">EventHub · AWS-style reference architecture</h3>
+<div class="arch-legend">
+<span><b>→</b> Request / data path</span><span><b>⇢</b> Configuration / discovery</span><span>Nested boxes = resource boundaries</span>
+</div>
+<div class="managed-control arch-boundary">
+<span class="boundary-label">CONTROL PLANE ONLY · SAME REGION · AWS-MANAGED ACCOUNT · OUTSIDE THE USER REQUEST PATH</span><div class="arch-service">
+<span class="service-badge">EKS</span><strong>Managed Kubernetes control plane</strong><p>API server, scheduler/controller state and managed etcd. Worker registration and reconciliation use the private endpoint; the user request does not traverse this API.</p>
+</div>
+</div>
+<div class="external-entry">
+<div><div class="arch-service">
+<span class="service-badge">CLIENT</span><strong>Synthetic-cedar browser</strong><p>Login first; submit tenant-scoped registration with an idempotency key.</p>
+</div></div>
+<div class="dns-lookup">DNS query / answer only ↔<br><div class="arch-service">
+<span class="service-badge">GLOBAL AWS SERVICE</span><strong>Amazon Route 53</strong><p>Resolve selected API hostname to the public NLB address. DNS is not an HTTP proxy.</p>
+</div>
+</div>
+</div>
+<div class="path-connector">
+<span>① HTTPS request ↓</span><span>↑ ⑥ Encrypted HTTP response</span>
+</div>
+<div class="arch-region arch-boundary">
+<span class="boundary-label">AWS REGION / CUSTOMER ACCOUNT · TO BE SELECTED</span>
+<div class="arch-vpc arch-boundary">
+<span class="boundary-label">AMAZON VPC · CANDIDATE 10.60.0.0/16</span>
+<div class="arch-public arch-boundary">
+<span class="boundary-label">PUBLIC SUBNETS A / B / C · INTERNET GATEWAY ROUTE</span><div class="arch-public-grid">
+<div class="arch-service">
+<span class="service-badge">ELB · NETWORK</span><strong>① Internet-facing NLB</strong><p>TCP 443 listener; pod-IP target groups reach NGINX endpoints in private workload subnets. NLB is regional; its interfaces span selected AZ subnets.</p>
+</div>
+<div class="arch-service">
+<span class="service-badge">NAT · EGRESS ONLY</span><strong>Same-AZ NAT gateways</strong><p>Outbound Internet dependencies use the selected egress design. NAT is not the browser’s inbound or response hop.</p>
+</div>
+</div>
+</div>
+<div class="path-connector">
+<span>② TCP / TLS to a healthy NGINX pod ↓</span><span>↑ Response on the matching load-balancer flow</span>
+</div>
+<div class="arch-cluster-label">KUBERNETES WORKER DATA PLANE · PRIVATE EC2 / VPC CNI</div>
+<div class="arch-az-grid">
+<section class="arch-az"><h3 class="boundary-label">AVAILABILITY ZONE A · SYMBOLIC</h3>
+<div class="arch-subnet">
+<span class="boundary-label">PRIVATE WORKLOAD SUBNET · 10.60.16.0/20</span><div class="arch-node system-node">
+<span class="service-badge">EC2 · SYSTEM CAPACITY</span><strong>Stable on-demand system pool</strong><div class="arch-pod">
+<span class="boundary-label">POD · GA · gateway-system</span><strong>NGINX data plane</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · nginx</span><p>TLS termination · chart-selected target port</p>
+</div>
+</div>
+</div>
+<div class="arch-node">
+<span class="service-badge">EC2 · APPLICATION CAPACITY</span><strong>apps-node-a</strong><p class="node-runtime">AL2023 / Linux kernel<br>kubelet → containerd → OCI runtime</p>
+<div class="arch-pod">
+<span class="boundary-label">POD · R1 · apps-dev</span><strong>registration-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · registration</span><p>Node.js / Fastify · HTTP 0.0.0.0:3000</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · I1 · apps-dev</span><strong>identity-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · identity</span><p>Node.js / Fastify · HTTP 0.0.0.0:3000</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · M1 · apps-dev</span><strong>monitoring-agent-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · monitoring-agent</span><p>Python synthetic checks · dedicated test tenant</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · N1 · apps-dev</span><strong>notification-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · notification</span><p>Node.js SQS consumer · durable mock delivery</p>
+</div>
+</div>
+</div>
+</div></section><section class="arch-az"><h3 class="boundary-label">AVAILABILITY ZONE B · SYMBOLIC</h3>
+<div class="arch-subnet">
+<span class="boundary-label">PRIVATE WORKLOAD SUBNET · 10.60.32.0/20</span><div class="arch-node system-node">
+<span class="service-badge">EC2 · SYSTEM CAPACITY</span><strong>Stable on-demand system pool</strong><div class="arch-pod">
+<span class="boundary-label">POD · GB · gateway-system</span><strong>NGINX data plane</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · nginx</span><p>TLS termination · chart-selected target port</p>
+</div>
+</div>
+</div>
+<div class="arch-node">
+<span class="service-badge">EC2 · APPLICATION CAPACITY</span><strong>apps-node-b</strong><p class="node-runtime">AL2023 / Linux kernel<br>kubelet → containerd → OCI runtime</p>
+<div class="arch-pod">
+<span class="boundary-label">POD · R2 · apps-dev</span><strong>registration-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · registration</span><p>Node.js / Fastify · HTTP 0.0.0.0:3000</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · I2 · apps-dev</span><strong>identity-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · identity</span><p>Node.js / Fastify · HTTP 0.0.0.0:3000</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · P1 · apps-dev</span><strong>registration-outbox-publisher</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · outbox-publisher</span><p>Node.js publisher · committed outbox → SNS</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · A1 · apps-dev</span><strong>audit-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · audit</span><p>Node.js SQS consumer · sanitized S3 records</p>
+</div>
+</div>
+</div>
+</div></section><section class="arch-az"><h3 class="boundary-label">AVAILABILITY ZONE C · SYMBOLIC</h3>
+<div class="arch-subnet">
+<span class="boundary-label">PRIVATE WORKLOAD SUBNET · 10.60.48.0/20</span><div class="arch-node system-node">
+<span class="service-badge">EC2 · SYSTEM CAPACITY</span><strong>Stable on-demand system pool</strong><div class="arch-pod">
+<span class="boundary-label">POD · GC · gateway-system</span><strong>NGINX data plane</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · nginx</span><p>TLS termination · chart-selected target port</p>
+</div>
+</div>
+</div>
+<div class="arch-node">
+<span class="service-badge">EC2 · APPLICATION CAPACITY</span><strong>apps-node-c</strong><p class="node-runtime">AL2023 / Linux kernel<br>kubelet → containerd → OCI runtime</p>
+<div class="arch-pod">
+<span class="boundary-label">POD · R3 · apps-dev</span><strong>registration-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · registration</span><p>Node.js / Fastify · HTTP 0.0.0.0:3000</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · I3 · apps-dev</span><strong>identity-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · identity</span><p>Node.js / Fastify · HTTP 0.0.0.0:3000</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · N2 · apps-dev</span><strong>notification-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · notification</span><p>Node.js SQS consumer · durable mock delivery</p>
+</div>
+</div>
+<div class="arch-pod">
+<span class="boundary-label">POD · A2 · apps-dev</span><strong>audit-service</strong><small>eth0 · CNI-assigned VPC IP</small><div class="arch-container">
+<span>CONTAINER · audit</span><p>Node.js SQS consumer · sanitized S3 records</p>
+</div>
+</div>
+</div>
+</div></section>
+</div>
+<p class="arch-route-strip">③ NGINX matches HTTPRoute <code>apps-dev/eventhub-registration</code> ⇢ Service <code>registration-service:80</code> / ready EndpointSlices → selected registration pod:<code>3000</code>. A Service is not a container; EndpointSlice is metadata.</p>
+<div class="arch-platform arch-boundary">
+<span class="boundary-label">PLATFORM WORKLOADS · DISTRIBUTED ON SIZED CAPACITY, NOT ONE SHARED POD</span><div class="arch-support-grid">
+<div class="arch-service">
+<span class="service-badge">KUBE-SYSTEM</span><strong>Node agents + DNS</strong><p>aws-node/IPAM, kube-proxy, Pod Identity agent; CoreDNS replicas. Node-scoped DaemonSets run where configured.</p>
+</div>
+<div class="arch-service">
+<span class="service-badge">CONTROL / SECURITY</span><strong>Argo + gateway controllers</strong><p>argocd; AWS LBC; NGINX Gateway Fabric controller; cert-manager/External Secrets; Keycloak in security-system with issuer ingress still to configure.</p>
+</div>
+<div class="arch-service">
+<span class="service-badge">OBSERVABILITY</span><strong>Collectors and signal backends</strong><p>Node log-collector DaemonSet; OTel gateway, Prometheus, Grafana, Loki and Tempo. One owner per signal stream.</p>
+</div>
+</div>
+</div>
+<div class="arch-control-link">⇢ PRIVATE CLUSTER API · EKS cross-account ENIs in dedicated control subnets<br>10.60.96.0/27 · 10.60.96.32/27 · 10.60.96.64/27 · not app-pod subnets</div>
+<div class="path-connector">
+<span>④ Registration DB connection · private VPC route ↓</span><span>↑ ⑤ Commit result to the registration process</span>
+</div>
+<div class="arch-data arch-boundary">
+<span class="boundary-label">ISOLATED DATA TIER A / B / C · NO INTERNET DEFAULT ROUTE</span><div class="arch-service">
+<span class="service-badge">RDS · POSTGRESQL</span><strong>Private database endpoint ·5432 / verified TLS</strong><p>Separate identity, registration and notification schemas/roles. Reference Multi-AZ writer/standby profile is subject to sizing; three data subnets do not imply three writers. Audit writes S3, not an invented audit database.</p>
+</div>
+<p class="arch-small">Data subnet candidates:10.60.80.0/24,10.60.81.0/24,10.60.82.0/24. DB security groups permit only authorized workload paths.</p>
+</div>
+<div class="arch-endpoints arch-boundary">
+<span class="boundary-label">PRIVATE AWS ACCESS · SEPARATE FROM POD / SERVICE ROUTING</span><p>Interface endpoints where configured: ECR API/DKR, SNS/SQS, Secrets Manager, EKS Auth and other selected dependencies. S3 gateway endpoint adds service-prefix routes. Endpoint DNS, policies and security groups must all allow the required calls.</p>
+</div>
+</div>
+<div class="arch-regional-services">
+<span class="boundary-label">REGIONAL AWS SERVICES · OUTSIDE THE CUSTOMER VPC SUBNETS</span><div class="arch-support-grid">
+<div class="arch-service">
+<span class="service-badge">ECR / SECRETS</span><strong>Images and workload access</strong><p>Digest-pinned repositories; Secrets Manager; Pod Identity-backed AWS credentials. Node image pulls use the node permission path.</p>
+</div>
+<div class="arch-service">
+<span class="service-badge">SNS / SQS</span><strong>Durable event delivery</strong><p>registration-events → independent notification/audit queues and DLQs. Workers long-poll and acknowledge only after durable processing.</p>
+</div>
+<div class="arch-service">
+<span class="service-badge">S3</span><strong>Audit and telemetry objects</strong><p>Audit logical bucket eventhub-dev-audit-records; separate observability storage. Physical names/retention are implementation inputs.</p>
+</div>
+</div>
+</div>
+</div>
+<p class="diagram-note">Target reference placement, not deployed inventory: R1–R3/I1–I3 are API replica aliases; M1/P1/N1–N2/A1–A2 complete the proposed twelve app pods. Gateway/system capacity here is illustrative; exact node/replica counts and chart-generated names are not fixed. AZ labels, CIDRs and addresses require review. Labels for pods/containers describe what will run after implementation.</p>
+</div>
+<figcaption>AWS-style boundaries with project-specific workloads. The numbered foreground path is one registration request; the surrounding services explain how it is delivered, secured and operated.</figcaption></figure><p>EKS cluster membership is a logical relationship rather than one box containing every AWS service. The managed control plane is separate from worker compute. NLB interfaces are public-facing while NGINX pods and application nodes stay private. RDS uses its own isolated data tier; ECR, SNS/SQS and S3 are regional services reached through the selected AWS connectivity paths.</p></section><section id="user-flow"><h2>A registration request, end to end</h2>
+<p>The concrete example below is a proposed API contract for implementation: <code>POST /registrations</code>, a bearer token from the selected Keycloak issuer, an idempotency key, and an event identifier. The application derives tenant scope from verified identity rather than trusting a body field. Region, public API/issuer hostnames, certificates and exact OpenAPI schemas still need to be selected and tested.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable architecture table"><table>
+<thead><tr>
+<th scope="col">Step</th>
+<th scope="col">What actually happens</th>
+<th scope="col">What this proves / does not prove</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>0 · Obtain identity</td>
+<td>The browser uses the selected OIDC login flow. Keycloak issues the token. identity-service manages profiles and roles; it is not the authorization server.</td>
+<td>Issuer exposure, client settings and callback URLs are implementation gates. A token alone does not authorize another tenant’s event.</td>
+</tr>
+<tr>
+<td>1 · Resolve and connect</td>
+<td>On a cache miss, the resolver obtains the API address via Route53/NLB DNS. The browser opens TCP 443 and negotiates TLS with NGINX through NLB forwarding.</td>
+<td>DNS is a lookup, not a request proxy. NAT is not this ingress path.</td>
+</tr>
+<tr>
+<td>2 · Terminate and route</td>
+<td>A selected NGINX pod handles the public certificate, host/path and HTTPRoute. Its upstream connection targets an eligible registration endpoint.</td>
+<td>NLB target health, route acceptance and app readiness are distinct checks. Exact target port and endpoint selection come from rendered controller state.</td>
+</tr>
+<tr>
+<td>3 · Reach the container</td>
+<td>The packet crosses the applicable VPC/node routing and veth boundary to the pod IP, then the registration container’s listener on 0.0.0.0:3000.</td>
+<td>VPC CNI supplies routable pod addresses. The Kubernetes API, Deployment and container runtime are not per-request HTTP proxies.</td>
+</tr>
+<tr>
+<td>4 · Authorize and transact</td>
+<td>Registration verifies JWT signature/issuer/audience/expiry/scopes using trusted keys, then tenant/resource access. A bounded DB operation enforces capacity and idempotency and writes registration + outbox atomically.</td>
+<td>Cached JWKS normally avoids a synchronous profile-service lookup on every request. SQL checks, locks/conditional updates and uniqueness must survive real concurrency.</td>
+</tr>
+<tr>
+<td>5 · Commit and create the response</td>
+<td>PostgreSQL returns commit success on the DB connection. The API constructs the registration result; the proposed new-registration response is 201 Created only after durable commit.</td>
+<td>A lost connection around commit can make the result uncertain. An idempotent retry must reconcile the original outcome rather than blindly sell another seat.</td>
+</tr>
+<tr>
+<td>6 · Return to the user</td>
+<td>The upstream HTTP result returns to NGINX. NGINX sends the response over the client’s TLS connection through the matching NLB flow; the browser receives the status/body.</td>
+<td>The response is not a new outbound call through NAT. Its success does not mean the notification worker or audit worker has completed.</td>
+</tr>
+<tr>
+<td>7 · Finish asynchronously</td>
+<td>The publisher sends committed outbox events to SNS. Notification and audit process their own SQS copies and record durable results.</td>
+<td>Queue completion needs its own evidence and latency measurement. It is separate from HTTP acceptance.</td>
+</tr>
+</tbody>
+</table></div>
+<figure><div class="system-diagram" role="group" aria-labelledby="request-return-title">
+<p class="diagram-title" id="request-return-title">Separate connections carry the forward and reverse result</p>
+<div class="diagram-group">
+<p class="diagram-label">Client-side connection</p>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Browser ⇄ NLB ⇄ NGINX</strong><span>Client TCP/TLS session; public TLS ends at NGINX</span>
+</li>
+<li class="diagram-node">
+<strong>NGINX ⇄ registration</strong><span>A separate upstream HTTP connection to an eligible pod</span>
+</li>
+<li class="diagram-node">
+<strong>registration ⇄ RDS</strong><span>A separate pooled PostgreSQL connection with verified TLS</span>
+</li>
+</ul>
+</div>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<div class="diagram-group">
+<p class="diagram-label">After the database commit</p>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>RDS → registration</strong><span>Commit outcome on the DB socket</span>
+</li>
+<li class="diagram-node">
+<strong>registration → NGINX</strong><span>HTTP status and body on the upstream socket</span>
+</li>
+<li class="diagram-node">
+<strong>NGINX → NLB → browser</strong><span>TLS records on the matching client flow</span>
+</li>
+</ol>
+</div>
+<p class="diagram-note">The first row shows distinct connection boundaries, not a single socket passed between processes. Connection reuse and retries must be bounded and observed; no extra ClusterIP hop is assumed for NGINX.</p>
+</div></figure><p>For a new registration, the draft response can report the registration identifier and confirmed reservation while describing subscriber delivery as pending. Replaying the same idempotency key with the same intent returns its original outcome; mismatched reuse must be rejected under the final API contract. A timeout after commit must not lead to duplicate business effects. No sample response here is captured runtime output.</p></section><section id="pod-network"><h2>Inside the worker: pod, container and network namespace</h2>
+<p>The <code>registration</code> container runs <code>node dist/server.js</code>; the outbox Deployment uses the same image digest with <code>node dist/outbox-publisher.js</code>. Kubelet and containerd create those processes from desired state. A node has one Linux kernel. Namespaces provide views and cgroups apply resource budgets; a pod is not a virtual machine with its own kernel.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="pod-zoom-title">
+<p class="diagram-title" id="pod-zoom-title">From a worker ENI to the registration socket</p>
+<div class="diagram-group">
+<p class="diagram-label">Destination worker / one registration pod</p>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Worker ENI + host routing</strong><span>VPC address reachability; supported policy and forwarding</span>
+</li>
+<li class="diagram-node">
+<strong>Pod network namespace</strong><span>veth/eth0, pod IP, loopback and socket namespace</span>
+</li>
+<li class="diagram-node">
+<strong>registration container</strong><span>Non-root Node.js process listens on 0.0.0.0:3000</span>
+</li>
+</ol>
+</div>
+<p class="diagram-note">A packet is addressed to the pod’s network endpoint, not to an extra “container IP.” Containers in the same pod share networking. Another pod’s127.0.0.1 is never the registration listener.</p>
+</div></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable architecture table"><table>
+<thead><tr>
+<th scope="col">Project path</th>
+<th scope="col">Packet behavior</th>
+<th scope="col">Diagnostic distinction</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>M1 → R1 on the same worker</td>
+<td>monitoring-agent sends from its own pod namespace; host routes/veth deliver locally to registration.</td>
+<td>A working local path does not establish that another worker/AZ can reach a replica.</td>
+</tr>
+<tr>
+<td>M1 → R2 on a different worker</td>
+<td>Source host/ENI → VPC routing → destination ENI/host routing → registration pod.</td>
+<td>Compare CNI state, SG/NACL/return path, policy and MTU. The baseline is not a VXLAN overlay.</td>
+</tr>
+<tr>
+<td>M1 → registration Service</td>
+<td>CoreDNS returns the allocated ClusterIP for registration-service.apps-dev.svc.cluster.local. Supported kube-proxy forwarding/conntrack select a ready endpoint:3000 for the connection to port 80.</td>
+<td>This describes a client that dials the VIP; NGINX may select discovered endpoint IPs directly.</td>
+</tr>
+<tr>
+<td>registration → RDS</td>
+<td>Use the private DB endpoint and authorized DB role over the local VPC path.</td>
+<td>No NAT hop is required for this private destination. Validate DB certificate/hostname and pool/deadline behavior.</td>
+</tr>
+<tr>
+<td>audit → S3 / publisher → SNS</td>
+<td>SDK calls use configured service DNS/endpoints and workload AWS permissions.</td>
+<td>Network reachability, endpoint policy and IAM permission are separate checks.</td>
+</tr>
+</tbody>
+</table></div>
+<p>A Service name and ClusterIP are stable discovery/routing abstractions while pods are replaced. EndpointSlice watches carry readiness and backend addresses to controllers and node agents. They do not forward packets themselves. A TCP connection can remain mapped to its selected backend; changing readiness does not instantaneously erase all established traffic.</p></section><section id="routing"><h2>Routes, security groups and return paths</h2>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable architecture table"><table>
+<thead><tr>
+<th scope="col">Tier / boundary</th>
+<th scope="col">Planned EventHub behavior</th>
+<th scope="col">Check before accepting it</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Public /24 tiers</td>
+<td>NLB entry and same-AZ NAT. Public route tables have an IGW default.</td>
+<td>Correct subnet discovery, target registration and health listeners; a public route does not make private workers public.</td>
+</tr>
+<tr>
+<td>Workload /20 tiers</td>
+<td>Private EC2 and VPC pod addresses; local destinations stay local. Internet dependencies use the chosen SNAT/NAT design.</td>
+<td>Per-AZ address headroom, warm CNI allocation, replacements and rollout surge; exact source-IP behavior.</td>
+</tr>
+<tr>
+<td>Data /24 tiers</td>
+<td>RDS subnet group; no Internet default; role-specific access to 5432.</td>
+<td>Client TLS verification, restrictive DB SG and response reachability. Multi-AZ is not a substitute for tested backup/restore.</td>
+</tr>
+<tr>
+<td>EKS ENI /27 tiers</td>
+<td>Private cluster API communication, headroom for lifecycle operations.</td>
+<td>Separate administration connectivity; no claim of SSH access to managed EKS etcd hosts.</td>
+</tr>
+<tr>
+<td>SG / NACL / NetworkPolicy</td>
+<td>Stateful SG rules, stateless subnet NACLs and enforced Kubernetes policy protect different boundaries.</td>
+<td>Test both request and return traffic, appropriate ephemeral ports, DNS TCP/UDP 53 and required control/telemetry paths.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Application pods do not automatically gain useful isolation merely by sharing the <code>apps-dev</code> namespace. Test default-deny and each required allow path against the chosen policy engine. NAT supports outbound Internet sessions; interface endpoints use their own SG/policy/private-DNS checks, and S3 gateway endpoints install a service-prefix route. These mechanisms solve different destination paths, not interchangeable versions of Service networking.</p></section><section id="async"><h2>One database commit, two independent subscribers</h2>
+<figure><div class="system-diagram" role="group" aria-labelledby="event-fanout-title">
+<p class="diagram-title" id="event-fanout-title">The outbox closes the database-to-message failure window</p>
+<div class="diagram-group">
+<p class="diagram-label">Durability before publication</p>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>registration-service</strong><span>Write registration and outbox in one transaction</span>
+</li>
+<li class="diagram-node">
+<strong>registration-outbox-publisher</strong><span>Retry committed events, publish, then mark sent</span>
+</li>
+<li class="diagram-node">
+<strong>eventhub-dev-registration-events</strong><span>SNS topic fans out separate subscription copies</span>
+</li>
+</ol>
+</div>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<div class="diagram-group">
+<p class="diagram-label">Independent queues and consumers</p>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>eventhub-dev-notifications</strong><span>N1/N2 share this SQS subscription; write mock-delivery and dedup records</span>
+</li>
+<li class="diagram-node">
+<strong>eventhub-dev-audit</strong><span>A1/A2 share their SQS subscription; persist sanitized audit S3 records</span>
+</li>
+</ul>
+</div>
+<p class="diagram-note">Each queue has its own -dlq. A crash after publish or after a side effect can repeat work. A local dedup record alone cannot promise exactly-once delivery to a real external mail provider.</p>
+</div></figure><p>The publisher and consumers need separate service accounts/IAM scopes: publication, receiving/deleting messages, and audit bucket writes are different permissions. Notification replicas compete for one queue’s work; audit receives its own copy. Visibility timeout, acknowledgement order, poison-message handling, DLQ repair and redrive all belong to the application’s correctness tests.</p>
+<p>The reference illustration has 12 application pods: identity 3, registration 3, publisher 1, notification 2, audit 2 and monitor 1. These are sizing inputs from the resource map. Each Deployment’s rollout allowance, platform pods, node replacements and warm CNI addresses add demand. More replicas also multiply DB pools and downstream work; scaling must respect those budgets.</p>
+<p>The dead-letter queues are eventhub-dev-notifications-dlq and eventhub-dev-audit-dlq. Their retention, redrive permissions and repair procedure must be configured and tested independently.</p></section><section id="mesh"><h2>Add mesh trust as an explicit later cutover</h2>
+<p>The baseline is NLB → NGINX → application endpoint. The security stage adds a dedicated private Istio gateway. NGINX verifies the gateway’s server certificate CA and hostname; the gateway then connects to app workloads with mesh mTLS and the permitted principal. Browser TLS, backend server TLS and mesh authentication are separate connections and policies.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="mesh-cutover-title">
+<p class="diagram-title" id="mesh-cutover-title">Later backend path, after compatibility and denial tests</p>
+<div class="diagram-group">
+<p class="diagram-label">Replaces the baseline NGINX-to-app hop</p>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>NGINX data-plane pod</strong><span>Verified backend TLS; restricted listener access</span>
+</li>
+<li class="diagram-node">
+<strong>Private Istio gateway</strong><span>istio-system; intended authenticated gateway principal</span>
+</li>
+<li class="diagram-node">
+<strong>registration replica</strong><span>Selected mesh mode; JWT/tenant decisions still applied</span>
+</li>
+</ol>
+</div>
+<p class="diagram-note">Do not assume NGINX is already a mesh client. The selected Istio mode determines proxy/container placement and ports; sidecar containers must not be invented before that choice is made.</p>
+</div></figure><ul>
+<li>Verify probe and metric paths, JWT propagation, route parity and backend certificate renewal before STRICT mTLS.</li>
+<li>Prove forbidden plaintext and wrong-principal traffic are rejected while the intended user path still succeeds.</li>
+<li>Measure the extra proxy hop’s latency/resources, and document the cutover and recovery route instead of relaxing policy to make traffic pass.</li>
+</ul></section><section id="operations"><h2>What keeps the request path running</h2>
+<figure><div class="system-diagram" role="group" aria-labelledby="ops-control-title">
+<p class="diagram-title" id="ops-control-title">Build and control traffic support the data plane</p>
+<div class="diagram-group">
+<p class="diagram-label">Release ownership</p>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>GitHub CI → ECR</strong><span>Test, scan and attest one image digest; OIDC publish identity</span>
+</li>
+<li class="diagram-node">
+<strong>Approved environment PR</strong><span>Promote digest and chart values; no credential payloads</span>
+</li>
+<li class="diagram-node">
+<strong>Argo CD → Kubernetes API</strong><span>Render/reconcile designated resources; kubelet/runtime pull and start pods</span>
+</li>
+</ol>
+</div>
+<div class="diagram-transition" aria-hidden="true">↓</div>
+<div class="diagram-group">
+<p class="diagram-label">Operational evidence</p>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Apps + node collectors</strong><span>Structured redacted logs; request/trace context through HTTP and events</span>
+</li>
+<li class="diagram-node">
+<strong>OTel / signal backends</strong><span>Prometheus, Loki, Tempo and Grafana with owned collection paths</span>
+</li>
+<li class="diagram-node">
+<strong>Monitoring + outside probe</strong><span>Synthetic tenant journey plus independent cluster-outage detection</span>
+</li>
+</ol>
+</div>
+<p class="diagram-note">These are release/observability relationships, not per-request network hops. Terraform owns cloud roots, add-on versions and IAM; bootstrap Helm installs Argo; controllers retain generated-resource cleanup ownership.</p>
+</div></figure><p>Kubelet reports pod status and manages containers; readiness controls eligible endpoints, while dependency-independent liveness avoids DB outage restart loops. During termination, endpoint propagation and HTTP draining overlap. Handle TERM, stop new work, drain bounded in-flight operations, close pools, and test duplicate-safe queue retry if the grace deadline is reached.</p>
+<p>The initial baseline uses managed EC2 capacity. Stable system placement precedes later constrained Karpenter application pools; HPA or KEDA must have one scale owner per workload. Topology spreading, compatible rollout/PDB settings and correctly sized node capacity are needed before reference replicas can establish useful AZ fault tolerance.</p></section><section id="proof"><h2>Prove the architecture with a single trace and targeted failures</h2>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable architecture table"><table>
+<thead><tr>
+<th scope="col">Scenario</th>
+<th scope="col">Expected evidence</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>One successful registration</td>
+<td>Selected hostname/certificate; NLB→NGINX route; registration trace and committed DB result; correct 201 response; later notification + audit completion.</td>
+</tr>
+<tr>
+<td>Last-seat race / retry after timeout</td>
+<td>No oversell, no duplicate registration, stable idempotent result and outbox consistency despite uncertain client receipt.</td>
+</tr>
+<tr>
+<td>Same-node succeeds, cross-node fails</td>
+<td>Discovered placement, pod IP/ENI/routes, policy/SG/NACL and return-path comparison; do not blame DNS without evidence.</td>
+</tr>
+<tr>
+<td>Pod restart / unavailable replica</td>
+<td>Readiness and endpoint changes, graceful termination, replacement image digest, bounded request behavior and successful original-flow retest.</td>
+</tr>
+<tr>
+<td>Worker or AZ interruption</td>
+<td>Actual remaining capacity/placement, gateway health, DB profile and queue continuity; no claim of HA from replica count alone.</td>
+</tr>
+<tr>
+<td>Publisher/consumer crash / data restore</td>
+<td>Outbox state, independent subscriptions, durable idempotency, DLQ/reconciliation and business-correct restored state.</td>
+</tr>
+<tr>
+<td>Wrong tenant / AWS role / mesh peer</td>
+<td>Separate denied-path results for user authorization, IAM and network/mesh identity; successful encryption alone is insufficient.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Proposed reference targets remain 50 requests/second with a defined mix and burst, 99.9% monthly eligible-request availability, and recovery objectives RPO ≤15 minutes/RTO ≤60 minutes. None is measured. The project’s planned 30 drills and 12 incident reports must include the actual revision, deployment profile, signal path and restoration proof. Short test windows and static diagrams do not establish those outcomes.</p>
+<p>Implementation still needs chosen account/region/domain, compatible versions, exact controller-generated resources and listener ports, finalized API schemas and measured node/endpoint placement. This article and the implementation walkthrough define a target to build and test; they do not report a live cluster.</p></section><footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

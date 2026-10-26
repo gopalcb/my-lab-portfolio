@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Setting up the Codex workspace</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / SETTING UP THE CODEX WORKSPACE</h1>
+<p class="lede">Build a repeatable GB Systems workspace by separating native Codex capabilities from the local conventions, tools and evidence that shape how work gets done.</p></header><aside class="notice"><strong>WORKSPACE SNAPSHOT · 18 OCTOBER 2026</strong><p>This describes the current local instructions, configuration and source. Examples show how to reproduce checks; they are not proof of a fresh install, backend memory health or cloud readiness.</p></aside><section id="boundaries"><h2>Start with the layers</h2>
+<p>Codex supplies the conversation, model access, tool calls and session execution. The GB Systems <code>.codex</code> folder adds working instructions, role definitions, reusable skills, workflows and small local tools. A folder full of Markdown does not itself create a scheduler or grant an agent more permissions.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="setup-layers-title">
+<p class="diagram-title" id="setup-layers-title">Three layers, three responsibilities</p>
+<section class="diagram-group"><h3 class="diagram-label">Read separately</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Codex client</strong><span>Login, session, tools and effective permissions</span>
+</li>
+<li class="diagram-node">
+<strong>.codex workspace</strong><span>Instructions, configuration, workflows, skills and helpers</span>
+</li>
+<li class="diagram-node">
+<strong>Affected project</strong><span>Source, manifest, architecture, tests and delivery evidence</span>
+</li>
+</ul></section><p class="diagram-note">The current session must verify the effective environment. A file on disk and a live, working integration are different facts.</p>
+</div></figure></section><section id="layout"><h2>Put each resource in a clear place</h2>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable resource table"><table>
+<thead><tr>
+<th scope="col">Workspace resource</th>
+<th scope="col">Purpose</th>
+<th scope="col">What to keep out</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code>AGENTS.md</code></td>
+<td>Project behavior, ownership, scope and verification rules</td>
+<td>Secrets and large copied manuals</td>
+</tr>
+<tr>
+<td>
+<code>config.toml</code> + <code>agents/</code>
+</td>
+<td>Local defaults and bounded specialist definitions</td>
+<td>Assumptions about another account’s model access</td>
+</tr>
+<tr>
+<td>
+<code>skills/</code> + <code>workflows/</code>
+</td>
+<td>Reusable task guidance and stage procedures</td>
+<td>A forced ceremony for every tiny edit</td>
+</tr>
+<tr>
+<td><code>tools/</code></td>
+<td>Executable helpers with their own contracts</td>
+<td>Undocumented background side effects</td>
+</tr>
+<tr>
+<td>
+<code>memories/</code>, task records and logs</td>
+<td>Recall, durable handoffs and observations with distinct roles</td>
+<td>Copied credentials, private transcripts or fabricated proof</td>
+</tr>
+</tbody>
+</table></div>
+<p>Resolve supporting paths from <code>CODEX_HOME</code>. Project paths still resolve from the affected project. A manifest such as <code>my-work-portfolio/.codex/project.toml</code> points to real source directories, test commands and preview settings; it is a navigation aid, not an application runtime.</p></section><section id="bootstrap"><h2>Bootstrap the local helpers deliberately</h2>
+<p>From the GB Systems workspace root, select this checkout’s Codex home. Authenticate using the supported client flow; do not copy <code>auth.json</code>, session databases or another machine’s credentials into a repository. Review configuration and executable tools before enabling them.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable shell example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Run from the GB Systems workspace root.</span>
+<span class="token keyword">export</span> CODEX_HOME=<span class="token string">"$PWD/.codex"</span>
+codex --version
+<span class="token comment"># Prepare the local helper environment when installing/rebuilding it:</span>
+python3 -m venv <span class="token string">"$CODEX_HOME/.venv"</span>
+<span class="token string">"$CODEX_HOME/.venv/bin/python"</span> -m pip install -r <span class="token string">"$CODEX_HOME/requirements.txt"</span>
+<span class="token comment"># Explicit initializer entry point after reviewing its behavior:</span>
+python3 <span class="token string">"$CODEX_HOME/tools/initializer/on_codex_run.py"</span></code></pre></div>
+<p>The initializer creates runtime log files, checks for the watcher process, prepares a virtual environment when absent, then launches the configured watcher. An existing environment causes its dependency-install step to be skipped. Run a deliberate dependency check/sync when rebuilding; “the directory exists” is not a dependency-health test.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="setup-start-title">
+<p class="diagram-title" id="setup-start-title">What initialization actually establishes</p>
+<section class="diagram-group"><h3 class="diagram-label">Initialization flow</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Initializer</strong><span>Resolve local tools and create runtime logs</span>
+</li>
+<li class="diagram-node">
+<strong>Watcher launch</strong><span>Start configured script unless already observed</span>
+</li>
+<li class="diagram-node">
+<strong>Readiness checks</strong><span>Inspect expected process, logs and outputs</span>
+</li>
+</ol></section><p class="diagram-note">The launch message proves a process was started, not that it kept running or produced correct indexes. The watcher’s own lock protects against duplicate active workers.</p>
+</div></figure></section><section id="models"><h2>Treat routing as an explicit local choice</h2>
+<p>The inspected <code>config.toml</code> currently selects <code>gpt-5.6-sol</code> with medium reasoning. The named specialists remain <code>low_effort</code> (Luna/low), <code>medium_effort</code> (GPT-6.1 Sol/medium) and <code>high_effort</code> (Astra/high). These are the local snapshot, not a claim that every installation has those models.</p>
+<p>Current project instructions keep routine work and planned stages in the main conversation. A specialist receives a bounded assignment when requested or justified. Delegating a task does not switch the parent model or authorize a persistent configuration edit.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="setup-routing-title">
+<p class="diagram-title" id="setup-routing-title">Route by uncertainty and consequence</p>
+<section class="diagram-group"><h3 class="diagram-label">Use the smallest adequate execution path</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>Main conversation</strong><span>Questions, small fixes and sequential planning/implementation</span>
+</li>
+<li class="diagram-node">
+<strong>Medium specialist</strong><span>Independent, understood implementation or documentation</span>
+</li>
+<li class="diagram-node">
+<strong>High specialist</strong><span>Ambiguous architecture, security or correctness review</span>
+</li>
+</ul></section><p class="diagram-note">Low-effort work stays bounded to clear extraction or small low-risk changes. The main conversation owns integration, records and final claims.</p>
+</div></figure></section><section id="controls"><h2>Verify permissions and integrations in a fresh session</h2>
+<p>The current local file sets <code>approval_policy = "never"</code> and <code>sandbox_mode = "danger-full-access"</code>. Describe those settings accurately and choose execution permissions consciously for a new installation. <code>AGENTS.md</code> expresses working rules; the actual client and environment enforce filesystem, tool and account access.</p>
+<ul>
+<li>Confirm the loaded instructions and effective model/permission settings after reopening the client.</li>
+<li>Check configured MCP tool discovery, then verify the real app or browser connection. Discovery alone does not prove GUI access.</li>
+<li>Use a harmless read-only task before relying on a custom helper. Keep cloud checks separate from local checks.</li>
+<li>Review plugin handlers and trust where required. Ordinary prompts must not activate the multi-agent messaging workflow.</li>
+</ul>
+<figure><div class="system-diagram" role="group" aria-labelledby="setup-proof-title">
+<p class="diagram-title" id="setup-proof-title">A small setup acceptance pass</p>
+<section class="diagram-group"><h3 class="diagram-label">Evidence in order</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Read files</strong><span>Correct home, project manifest and reviewed instructions</span>
+</li>
+<li class="diagram-node">
+<strong>Exercise a local task</strong><span>Locate source, run the intended check, inspect the result</span>
+</li>
+<li class="diagram-node">
+<strong>Record the boundary</strong><span>What worked, what was not tested, and the exact next step</span>
+</li>
+</ol></section><p class="diagram-note">Configuration and documents persist on disk. Background processes and shell bootstrap after restart need their own verification; no always-on service is assumed.</p>
+</div></figure></section><footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+

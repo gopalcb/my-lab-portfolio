@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    actor Browser as Angular browser
+    participant Web as web-api (Pod 1)
+    participant User as user-service (Pod 2)
+    participant Profile as profile-service (Pod 3)
+    participant DB as PostgreSQL (external)
+    participant OTel as Collector sidecar
+    Browser->>Web: GET /api/users/42/profile + traceparent
+    activate Web
+    Web->>User: GET /users/42 + new parent span ID
+    activate User
+    User->>Profile: GET /profiles/42 + new parent span ID
+    activate Profile
+    opt Database phase
+      Profile->>DB: SELECT profile
+      DB-->>Profile: profile record
+    end
+    Profile-->>User: profile JSON
+    deactivate Profile
+    User-->>Web: merged user/profile
+    deactivate User
+    Web-->>Browser: HTTP 200 + x-request-id
+    deactivate Web
+    par Telemetry exported asynchronously
+       Web--)OTel: OTLP spans + logs
+       User--)OTel: OTLP spans + logs
+       Profile--)OTel: OTLP spans + logs
+    end

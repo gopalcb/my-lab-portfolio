@@ -1,0 +1,19 @@
+flowchart TB
+    subgraph EKS["EKS — Single Worker Node"]
+        W["Pod 1: web-api"]
+        U["Pod 2: user-service"]
+        P["Pod 3: profile-service"]
+        C["Collector Sidecar<br/>Inside Pod 1"]
+
+        W -->|"OTLP"| C
+        U -->|"OTLP"| C
+        P -->|"OTLP"| C
+    end
+
+    C -->|"Traces"| T[("Tempo")]
+    C -->|"Logs"| L[("Loki")]
+    C -->|"Logs"| E[("Elasticsearch")]
+
+    T --> G["Grafana"]
+    L --> G
+    E --> K["Kibana"]

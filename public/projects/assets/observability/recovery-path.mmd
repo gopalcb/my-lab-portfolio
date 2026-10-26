@@ -1,0 +1,14 @@
+flowchart TD
+    Alert[User-impact SLO alert] --> Scope[Compare route, version, and region]
+    Scope --> Trace[Open correlated trace]
+    Trace --> Decision{Where is the delay or loss?}
+    Decision -->|Redis timeout or miss spike| Cache[Check cache health and origin load]
+    Decision -->|EKS or SQL span| Domain[Check pods, pools, replicas, and DB timing]
+    Decision -->|Queue age or DLQ| Async[Check outbox, SQS attempts, and idempotency]
+    Decision -->|No server span| Edge[Check browser, ALB, and telemetry health]
+    Cache --> Mitigate[Apply bounded mitigation]
+    Domain --> Mitigate
+    Async --> Mitigate
+    Edge --> Mitigate
+    Mitigate --> Verify[Compare latency, errors, freshness, and completed work]
+    Verify --> Recovered[Recovery is evidenced]

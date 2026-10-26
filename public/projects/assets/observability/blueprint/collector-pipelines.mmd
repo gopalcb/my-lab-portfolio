@@ -1,0 +1,13 @@
+flowchart LR
+   A["Web API<br/>OTLP SDK"] -.-> R
+   B["User service<br/>OTLP SDK"] -.-> R
+   C["Profile service<br/>OTLP SDK"] -.-> R
+   subgraph OTEL["Collector sidecar inside Pod 1"]
+     R["OTLP Receiver"] --> M["Memory limiter"] --> BA["Batch"]
+   end
+   BA -->|"Traces"| T[("Tempo")]
+   BA -->|"Logs"| L[("Loki")]
+   BA -->|"Same logs"| E[("Elasticsearch")]
+   T --> G["Grafana / Trace view"]
+   L --> G
+   E --> K["Kibana / ES|QL"]

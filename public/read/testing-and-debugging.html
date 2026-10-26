@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An evidence-first runbook for the proposed lab, from AWS identity and packet paths to process limits, queue correctness and recovery.">
+<title>Testing and debugging</title>
+<link rel="stylesheet" href="reading.css">
+</head>
+<body><main id="top"><header><h1 class="breadcrumb">SYSTEM DESIGN / TESTING AND DEBUGGING</h1>
+<p class="lede">An evidence-first runbook for the proposed lab, from AWS identity and packet paths to process limits, queue correctness and recovery.</p></header><aside class="notice"><strong>PLANNED LAB · DOCUMENTATION ONLY</strong><p>The repository contains plans and drill guides. Application code, Terraform, CI and deployed EKS resources are not built yet. Diagrams show the target; commands and outcomes are examples, not recorded results.</p></aside><section id="method"><h2>Make one claim testable</h2>
+<p class="resource-context">Start with one failed synthetic-cedar registration and its source revision. Keep that request as the reproduction throughout diagnosis.</p>
+<p>This is a runbook for a future isolated dev lab. Its commands have not been executed against EventHub; resource names are planned conventions. Start from the affected user journey, tenant, time window and first bad release. Preserve a successful comparison path. Change one bounded variable only after evidence supports the hypothesis, then repeat the original failure and the relevant correctness/security tests.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="testing-and-debugging-evidence-incident-loop-title">
+<p class="diagram-title" id="testing-and-debugging-evidence-incident-loop-title">Investigate a failed EventHub registration</p>
+<section class="diagram-group"><h3 class="diagram-label">Observe before changing</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Failed registration request</strong><span>Capture time, synthetic tenant, route and revision</span>
+</li>
+<li class="diagram-node">
+<strong>One boundary hypothesis</strong><span>NGINX route, R1 readiness, DB pool or outbox?</span>
+</li>
+<li class="diagram-node">
+<strong>Bounded evidence</strong><span>Compare working replica/path; preserve safe logs</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Repair only when supported</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Declared resource owner</strong><span>Make the smallest justified change</span>
+</li>
+<li class="diagram-node">
+<strong>Retest original journey</strong><span>Capacity, idempotency, both queues and tenant denials</span>
+</li>
+<li class="diagram-node">
+<strong>Record and prevent</strong><span>Restore baseline; cause, uncertainty, owner</span>
+</li>
+</ol></section><p class="diagram-note">Unsupported hypothesis: return to evidence. Persistent failure: preserve the new observations and repeat diagnosis instead of applying unrelated changes.</p>
+</div>
+<figcaption>EventHub target design · Investigate a failed EventHub registration.</figcaption></figure><p>A registration timeout could be gateway routing, an exhausted DB pool, an event-loop stall or a network path. “Kubernetes is broken” is not a discriminating hypothesis. Prefer “only pods in AZ B time out reaching PostgreSQL, while same-version AZ A pods succeed.” That claim predicts which routes, security rules and connection metrics should differ.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Future approved dev identity/context; these commands were not run.</span>
+aws sts get-caller-identity --profile <span class="token string">"$LAB_PROFILE"</span> --region <span class="token string">"$LAB_REGION"</span>
+kubectl config current-context
+kubectl -n apps-dev get pods \
+  -l app.kubernetes.io/name=registration-service -o wide
+kubectl -n apps-dev get deploy registration-service registration-outbox-publisher
+kubectl -n apps-dev get svc registration-service
+kubectl -n apps-dev get events --sort-by=.metadata.creationTimestamp</code></pre></div>
+<p>Events expire. Logs can carry credentials or personal data: select a bounded time window and sanitize evidence. A Deployment log request is not guaranteed to aggregate every replica. Select the exact pod/container; for a restarted container, use previous logs. Metrics-server is required for kubectl top, which is neither a history store nor a profiler.</p></section><section id="layers"><h2>Find the first failed boundary</h2>
+<p class="resource-context">Trace the chosen EventHub API host through NLB, NGINX and registration before blaming its database or asynchronous workers.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="testing-and-debugging-failure-boundary-ladder-title">
+<p class="diagram-title" id="testing-and-debugging-failure-boundary-ladder-title">Find the first failed EventHub boundary</p>
+<section class="diagram-group"><h3 class="diagram-label">Outside the cluster</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Chosen EventHub API hostname</strong><span>DNS answer and verified certificate</span>
+</li>
+<li class="diagram-node">
+<strong>NLB IP targets</strong><span>NGINX pod health + listener reachability</span>
+</li>
+<li class="diagram-node">
+<strong>NGINX eventhub-public</strong><span>HTTPRoute attachment, host/path and upstream timing</span>
+</li>
+</ol></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Inside apps-dev</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>registration-service endpoints</strong><span>Ready addresses, selector and port 3000</span>
+</li>
+<li class="diagram-node">
+<strong>registration process</strong><span>Listening socket, JWT/tenant decisions and pool waits</span>
+</li>
+<li class="diagram-node">
+<strong>Data or event dependency</strong><span>RDS transaction; publisher/SNS only after commit</span>
+</li>
+</ol></section><p class="diagram-note">A direct registration-pod comparison narrows the fault but bypasses normal routing. Later mesh failures add private-gateway TLS, principal authorization and policy checks.</p>
+</div>
+<figcaption>EventHub target design · Find the first failed EventHub boundary.</figcaption></figure><p>NXDOMAIN is not a TCP timeout; a successful TCP handshake is not certificate validation; a trusted TLS session is not an authorized user request. A gateway 404 suggests a different route/host problem from a 504 upstream deadline, although exact status mapping is implementation dependent. Identify the first boundary whose expected observation is missing.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell"><span class="token comment"># Inspect EventHub's control state without treating it as a packet hop.</span>
+kubectl -n apps-dev get endpointslices \
+  -l kubernetes.io/service-name=registration-service -o yaml
+kubectl -n gateway-system get gateway eventhub-public -o yaml
+kubectl -n apps-dev get httproute eventhub-registration -o yaml
+<span class="token comment"># Populate only from the future lab's selected DNS/certificate configuration.</span>
+: <span class="token string">"${EVENTHUB_API_HOST:?Set the selected EventHub API hostname}"</span>
+curl --connect-timeout <span class="token number">3</span> --max-time <span class="token number">10</span> <span class="token string">"https://${EVENTHUB_API_HOST}/healthz"</span>
+openssl s_client -connect <span class="token string">"${EVENTHUB_API_HOST}:443"</span> \
+  -servername <span class="token string">"$EVENTHUB_API_HOST"</span> -verify_hostname <span class="token string">"$EVENTHUB_API_HOST"</span> \
+  -verify_return_error &lt; /dev/<span class="token keyword">null</span></code></pre></div>
+<p><code>example.test</code> is reserved example syntax, not a selected public certificate domain. Substitute the actual domain and trusted CA path as needed. Expected TLS evidence is a valid chain and hostname; disabling verification does not satisfy the check. Avoid verbose authenticated requests that print tokens into transcripts. An approved ephemeral debug workload is preferable to adding a shell and packet tools to every app image.</p></section><section id="cloud"><h2>Cloud and delivery: inspect before repairing</h2>
+<p class="resource-context">Tie image-pull failures to eventhub/registration-service and node pull permissions; tie publish failures to registration-outbox-publisher and its SNS role.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Drills / symptom</th>
+<th scope="col">Hypothesis</th>
+<th scope="col">Read-only discriminator</th>
+<th scope="col">Interpretation</th>
+<th scope="col">Bounded fix after proof</th>
+<th scope="col">Retest</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>F-36 API unreachable; F-20 Forbidden</td>
+<td>Private path failure versus authorization</td>
+<td>Resolve endpoint; test TCP/TLS from connected runner; kubectl auth can-i for intended verb</td>
+<td>Timeout differs from 401/403; IAM identity alone grants no routed path</td>
+<td>Repair exact route/SG/DNS or scoped access entry/RBAC owner</td>
+<td>Authorized private operation passes; other scope remains denied</td>
+</tr>
+<tr>
+<td>F-37 Terraform lock/drift</td>
+<td>Competing run or legitimate external change</td>
+<td>Inspect active run/lock owner, state version and reviewed plan deltas</td>
+<td>An active lock is coordination, not an error to bypass</td>
+<td>Stop competing writes; reconcile/import legitimate owned drift</td>
+<td>One owner completes; second plan clean; inventory has no orphan charges</td>
+</tr>
+<tr>
+<td>F-19 AWS AccessDenied; CI OIDC trust gate</td>
+<td>Wrong role/subject/resource policy</td>
+<td>Inspect sanitized SDK action/resource, role trust and workflow claims metadata; Pod Identity association</td>
+<td>Node, CI and workload roles answer different questions</td>
+<td>Narrow trust/permissions or correct association; no broad node-role workaround</td>
+<td>Intended action succeeds; wrong branch/resource remains denied</td>
+</tr>
+<tr>
+<td>F-05 ImagePullBackOff; F-14 egress</td>
+<td>Missing digest, node pull IAM or ECR layer path</td>
+<td>Pod events; exact repository/digest; node errors; ECR API/DKR/S3 endpoint routes/policies</td>
+<td>App IAM does not prove node image-pull authorization</td>
+<td>Correct image, node permission or one missing endpoint dependency</td>
+<td>Cold pull on fresh node succeeds; private access still bounded</td>
+</tr>
+<tr>
+<td>F-32 bad release/schema</td>
+<td>Application/schema compatibility broken</td>
+<td>First bad digest, deployment status and sanitized schema-boundary errors</td>
+<td>A chart revert may be unsafe after contraction</td>
+<td>Compatible Git revert or reviewed forward migration</td>
+<td>Old/new read-write compatibility and original journey pass</td>
+</tr>
+<tr>
+<td>F-35 webhook unavailable</td>
+<td>Admission dependency, not scheduler failure</td>
+<td>API admission error, webhook endpoint/certificate/failurePolicy</td>
+<td>Request may never have produced a schedulable pod</td>
+<td>Restore webhook/cert; narrow documented emergency path if necessary</td>
+<td>Policy works and unsafe resources stay denied</td>
+</tr>
+</tbody>
+</table></div>
+<p>No terraform apply, force-unlock, namespace deletion or broad IAM grant belongs in an automatic diagnostic sequence. Repairs above are candidate actions for the confirmed cause and future approved dev scope, not commands executed for this article. Supply-chain gates also require explicit builder/signature/SBOM evidence, independently of a green rollout.</p></section><section id="workloads"><h2>Scheduling, startup and storage</h2>
+<p class="resource-context">Inspect the registration Deployment/container explicitly. Storage probes and PDB checks apply to the actual EventHub resources involved.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Drills / symptom</th>
+<th scope="col">Hypothesis</th>
+<th scope="col">Read-only discriminator</th>
+<th scope="col">Interpretation</th>
+<th scope="col">Bounded fix after proof</th>
+<th scope="col">Retest</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>F-04 Pending; F-28 capacity</td>
+<td>Requests/constraints exceed schedulable capacity</td>
+<td>Scheduler events, requests, taints, topology; Karpenter status/logs and quotas</td>
+<td>Unschedulable differs from sandbox/IP allocation failure</td>
+<td>Correct intended constraints or eligible capacity; preserve system pool</td>
+<td>Pods spread as intended; sensitive nodes remain excluded</td>
+</tr>
+<tr>
+<td>F-01 CrashLoop; F-06 probes</td>
+<td>Process failure versus probe-induced kill</td>
+<td>Last exit reason, previous logs, config revision and probe timing</td>
+<td>Startup, readiness and liveness have different effects</td>
+<td>Repair command/config or startup budget; remove external dependency from liveness</td>
+<td>Sustained ready state and dependency-outage behavior</td>
+</tr>
+<tr>
+<td>F-02 OOM; F-03 throttling; F-39 PID/FD</td>
+<td>Cgroup cap/leak rather than whole-node shortage</td>
+<td>Container status; memory.events/cpu.stat/pids.events; heap/FD trends</td>
+<td>Node can have spare resources while one container is capped</td>
+<td>Fix leak/heavy work and size measured bounded limits</td>
+<td>Original load/soak passes without unbounded limits</td>
+</tr>
+<tr>
+<td>F-21 NotReady; F-22 disk/inodes</td>
+<td>Kubelet/runtime cannot maintain node health</td>
+<td>Node conditions; kubelet/containerd journal; df bytes/inodes; runtime/log growth</td>
+<td>Disk free bytes do not prove inode headroom</td>
+<td>Retention/image-GC repair or safe replacement; no live runtime-file deletion</td>
+<td>Replacement joins; sustained writes and workloads stable</td>
+</tr>
+<tr>
+<td>F-23 PVC Pending/Multi-Attach</td>
+<td>Storage/AZ/CSI/IAM constraint</td>
+<td>PVC events, StorageClass mode, PV/node AZ and CSI errors</td>
+<td>A volume tied to one AZ cannot follow arbitrary scheduling</td>
+<td>Correct topology/class; detach only after original writer is stopped</td>
+<td>Integrity checks and single-writer attachment pass</td>
+</tr>
+<tr>
+<td>F-27 scaling; F-29 blocked drain</td>
+<td>Missing metrics or disruption headroom</td>
+<td>HPA/KEDA conditions, requests, metric path; PDB allowed disruptions/replica health</td>
+<td>Scaling and eviction are controlled by different owners</td>
+<td>Repair metric/scale owner or restore healthy spare capacity</td>
+<td>Load scales within DB budget; controlled eviction respects service objective</td>
+</tr>
+</tbody>
+</table></div>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell">registration_pod=$(kubectl -n apps-dev get pods \
+  -l app.kubernetes.io/name=registration-service \
+  -o jsonpath=<span class="token string">'{.items[0].metadata.name}'</span>)
+: <span class="token string">"${registration_pod:?No registration pod found}"</span>
+kubectl -n apps-dev describe pod <span class="token string">"$registration_pod"</span>
+kubectl -n apps-dev logs <span class="token string">"$registration_pod"</span> -c registration --tail=<span class="token number">100</span>
+<span class="token comment"># Only after a restart, compare the previous container instance:</span>
+kubectl -n apps-dev logs <span class="token string">"$registration_pod"</span> -c registration --previous --tail=<span class="token number">100</span>
+kubectl -n apps-dev top pods --containers
+kubectl -n apps-dev get pdb
+<span class="token comment"># Inspect PVCs only when diagnosing the separate local/storage exercises;</span>
+<span class="token comment"># cloud registration business data belongs to RDS, not an invented app PVC.</span></code></pre></div>
+<p>A Running pod is not necessarily Ready; a Ready pod is not proof that a registration race is safe. Avoid moving every workload to unrestricted nodes, removing every PDB or forcing simultaneous volume writers just to make a status turn green.</p></section><section id="network"><h2>Networking, edge and identity boundaries</h2>
+<p class="resource-context">Compare M1 → R1 and M1 → R2 after discovering placement; use eventhub-public and eventhub-registration for the public edge check.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="testing-and-debugging-network-comparisons-title">
+<p class="diagram-title" id="testing-and-debugging-network-comparisons-title">Compare EventHub paths that differ in one boundary</p>
+<section class="diagram-group"><h3 class="diagram-label">Three diagnostic comparisons · independent</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>External fails; M1 succeeds</strong><span>Inspect NLB, NGINX route and public TLS</span>
+</li>
+<li class="diagram-node">
+<strong>M1 → R1 works; M1 → R2 fails</strong><span>Compare node/AZ placement, CNI, routes, SG/NACL and MTU</span>
+</li>
+<li class="diagram-node">
+<strong>Intended mesh peer works</strong><span>Verify forbidden principal/plaintext still fail</span>
+</li>
+</ul></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Return to the real user flow</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>HTTPS registration</strong><span>Use original hostname, tenant and request</span>
+</li>
+<li class="diagram-node">
+<strong>Correct database outcome</strong><span>Capacity and idempotency hold</span>
+</li>
+<li class="diagram-node">
+<strong>Notification + audit</strong><span>Both subscriptions complete without lost work</span>
+</li>
+</ol></section><p class="diagram-note">M1/R1/R2 are discovered workload replicas, not hard-coded pod names. Encryption, authentication and authorization need separate tests.</p>
+</div>
+<figcaption>EventHub target design · Compare EventHub paths that differ in one boundary.</figcaption></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Drills / symptom</th>
+<th scope="col">Hypothesis</th>
+<th scope="col">Read-only discriminator</th>
+<th scope="col">Interpretation</th>
+<th scope="col">Bounded fix after proof</th>
+<th scope="col">Retest</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>F-07 no backends; F-08 DNS</td>
+<td>Wrong selector/readiness/port versus resolver path</td>
+<td>Service/EndpointSlice labels, sockets; exact FQDN and CoreDNS policy/logs</td>
+<td>DNS answer, eligible backend and listening port are separate</td>
+<td>Correct reference/port or DNS allow/capacity</td>
+<td>Normal Service name works; negative lookup behaves correctly</td>
+</tr>
+<tr>
+<td>F-09 cross-node; F-13 SG/NACL; F-38 MTU</td>
+<td>AZ/path-specific forwarding or return failure</td>
+<td>Compare same/cross-node, routes, Flow Logs, NACL return ports; small/large requests</td>
+<td>Small success does not rule out PMTU/large-response failure</td>
+<td>Repair one confirmed rule/route/MTU path</td>
+<td>Bidirectional and large-response tests pass across AZ pairs</td>
+</tr>
+<tr>
+<td>F-10 IP exhaustion; F-11 prefix fragmentation</td>
+<td>No usable pod address or contiguous /28</td>
+<td>Sandbox events, aws-node/IPAM, subnet free addresses and ENI/prefix slots</td>
+<td>Free aggregate addresses can coexist with prefix failure</td>
+<td>Planned capacity/reservations/warm allocation; safe node transition</td>
+<td>Peak plus surge schedules with per-subnet headroom</td>
+</tr>
+<tr>
+<td>F-12 policy; F-14 NAT/endpoint</td>
+<td>Explicit deny or missing egress dependency</td>
+<td>Allowed/denied client pair; enforcement evidence; endpoint DNS/SG/policy and NAT routes</td>
+<td>Accepted policy YAML does not prove enforcement</td>
+<td>Narrow intended allow or missing path; keep defaults</td>
+<td>DNS/SDK/JWKS/cold pull work; forbidden lateral traffic fails</td>
+</tr>
+<tr>
+<td>F-15 NLB; F-16 gateway; F-17 TLS</td>
+<td>Wrong target health, route attachment or trust</td>
+<td>Target health reason/AZ/mode; Gateway/HTTPRoute conditions; certificate SAN/chain/SNI</td>
+<td>NLB TCP health does not validate HTTP or tenant access</td>
+<td>Correct target/health/route/cert at declared owner</td>
+<td>Original external host/path succeeds; unknown host stays rejected</td>
+</tr>
+<tr>
+<td>F-18 mesh; F-34 key/secret rotation</td>
+<td>Wrong peer policy or stale identity material</td>
+<td>Proxy cert/policy state, mTLS telemetry, JWT kid/cache and credential reload timing</td>
+<td>Server TLS, mesh identity, JWT and DB credentials are distinct</td>
+<td>Restore exact enrollment/trust/allow policy or overlap rotation</td>
+<td>Intended peer/new key passes; plaintext/wrong principal/retired key denied</td>
+</tr>
+</tbody>
+</table></div>
+<p>The proposed edge is Gateway Fabric plus Gateway API; the separate F5 NIC exercise uses its own APIs. Do not troubleshoot community ingress-nginx annotations as if they configure Gateway Fabric. The security-stage NGINX→private Istio gateway hop verifies server TLS; the next hop uses mesh mTLS and principal authorization. Check both boundaries before enabling STRICT. </p></section><section id="data"><h2>Application, queue and recovery correctness</h2>
+<p class="resource-context">A committed registration, publisher success, notification completion and audit S3 write are four different pieces of evidence.</p>
+<div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><table>
+<thead><tr>
+<th scope="col">Drills / symptom</th>
+<th scope="col">Hypothesis</th>
+<th scope="col">Read-only discriminator</th>
+<th scope="col">Interpretation</th>
+<th scope="col">Bounded fix after proof</th>
+<th scope="col">Retest</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>F-24 DB pool exhaustion</td>
+<td>Replica count multiplies pool use; lock/slow query holds connections</td>
+<td>Pool wait metrics, active connection/lock counts and sanitized query class</td>
+<td>Scaling API replicas can intensify DB overload</td>
+<td>Bound concurrency/pools and fix query/lock; preserve DB budget</td>
+<td>Same workload meets latency/correctness with pool headroom</td>
+</tr>
+<tr>
+<td>F-25 poison/duplicate; F-26 race</td>
+<td>Consumer side effect repeats or capacity transaction is unsafe</td>
+<td>Queue age/receive/DLQ metrics; event processing keys; constraint/race evidence</td>
+<td>At-least-once delivery and independent subscribers require explicit design</td>
+<td>Quarantine/repair schema, bounded redrive; transactional constraint correction</td>
+<td>Crash/replay creates no duplicate effect; concurrent seats never oversell</td>
+</tr>
+<tr>
+<td>F-30 telemetry; F-31 volume cost</td>
+<td>Collection loss or unbounded cardinality</td>
+<td>Collector export/drop/queue counters; stream/label and bytes trends</td>
+<td>Missing data may mean broken visibility rather than healthy service</td>
+<td>Repair bounded pipeline; remove unbounded labels/payloads</td>
+<td>Known operation arrives across signals; useful queries survive lower volume</td>
+</tr>
+<tr>
+<td>F-33 AZ/Spot; F-40 restore</td>
+<td>Replica placement/data dependencies or recovery inputs missing</td>
+<td>AZ-correlated targets/nodes/NAT; backup watermark, KMS/secrets/roles and event skew</td>
+<td>HA is not backup; backup existence is not recovery</td>
+<td>Healthy-zone capacity and reviewed restore/reconciliation path</td>
+<td>Original journey correct; measured RTO/RPO, losses/duplicates accounted for</td>
+</tr>
+</tbody>
+</table></div>
+<p>PostgreSQL’s activity and lock views help distinguish a blocked query from an unavailable database; inspect metadata without exporting customer query text.  Queue completion latency must be measured separately from HTTP acceptance. A 200 response before a subscriber finishes does not prove end-to-end completion.</p>
+<p>The outbox publisher can duplicate after a crash, and an SQS worker can repeat a side effect before acknowledgement. Record event versions and durable processing keys, and reconcile external effects rather than promising exactly-once delivery. Separate notification and audit queues let both receive events while replicas within each subscription compete.</p></section><section id="linux"><h2>Linux observations explain Kubernetes symptoms</h2>
+<p class="resource-context">Start from the worker and cgroup of the selected registration replica, not an unrelated host or process.</p>
+<figure><div class="system-diagram" role="group" aria-labelledby="testing-and-debugging-linux-resource-scopes-title">
+<p class="diagram-title" id="testing-and-debugging-linux-resource-scopes-title">Match registration symptoms to the right Linux evidence</p>
+<section class="diagram-group"><h3 class="diagram-label">Inspect the affected resource · independent scopes</h3>
+<ul class="diagram-parallel">
+<li class="diagram-node">
+<strong>registration container</strong><span>OOM/throttle → termination reason + actual cgroup counters</span>
+</li>
+<li class="diagram-node">
+<strong>registration worker</strong><span>Eviction/NotReady → pressure + kubelet/containerd history</span>
+</li>
+<li class="diagram-node">
+<strong>registration process</strong><span>Timeout/accept failure → socket, PID and FD trends</span>
+</li>
+</ul></section><div class="diagram-transition" aria-hidden="true">↓</div>
+<section class="diagram-group"><h3 class="diagram-label">Validate the repair</h3>
+<ol class="diagram-flow">
+<li class="diagram-node">
+<strong>Same request + revision scope</strong><span>Avoid changing unrelated variables</span>
+</li>
+<li class="diagram-node">
+<strong>Workload and host signals</strong><span>Compare same bounded time window</span>
+</li>
+<li class="diagram-node">
+<strong>Business and security checks</strong><span>Registration, event delivery and denied tenant</span>
+</li>
+</ol></section><p class="diagram-note">Free host memory does not remove a container cap. Capture discovered node/process identities; do not use host PID1 as the registration process by assumption.</p>
+</div>
+<figcaption>EventHub target design · Match registration symptoms to the right Linux evidence.</figcaption></figure><div class="scroll" tabindex="0" role="region" aria-label="Scrollable diagram, table or code example"><pre data-language="SHELL"><code class="language-shell">registration_pod=$(kubectl -n apps-dev get pods \
+  -l app.kubernetes.io/name=registration-service \
+  -o jsonpath=<span class="token string">'{.items[0].metadata.name}'</span>)
+: <span class="token string">"${registration_pod:?No registration pod found}"</span>
+kubectl -n apps-dev get pod <span class="token string">"$registration_pod"</span> \
+  -o jsonpath=<span class="token string">'{.spec.nodeName}'</span>
+<span class="token comment"># On exactly that worker, after approved access, with prepared tools:</span>
+date -u
+df -h
+df -i
+free -m
+vmstat <span class="token number">1</span> <span class="token number">5</span>
+ip -s link
+ip route
+cat /proc/pressure/memory
+journalctl -u kubelet --since <span class="token string">"15 minutes ago"</span> --no-pager -n <span class="token number">100</span>
+<span class="token comment"># Correlate with registration's termination reason and container cgroup.</span></code></pre></div>
+<p>For memory, compare RSS/heap trend and the actual container cgroup’s memory events with node availability and eviction conditions. For storage, compare bytes, inodes, mount mode and latency. For startup permission errors, inspect UID/GID, parent traversal permission and executable/mount flags before changing ownership. For connection errors, inspect listening address, established/retransmit/TIME_WAIT trends and FD/PID budgets. Check UTC and clock synchronization before calling a certificate expired or reordering a distributed timeline.</p>
+<p>Bound privileged diagnostics such as namespace entry, tracing or capture to approved nodes and synthetic traffic. EKS control-plane hosts are managed: use API/audit/control-plane logs rather than claiming SSH access to etcd. Linux VM or disposable kubeadm evidence must stay labeled separately from EKS.</p></section><section id="evidence"><h2>Evidence from a completed drill</h2>
+<p class="resource-context">Record whether the restored journey includes both eventhub-dev-notifications and eventhub-dev-audit, with correct idempotency and tenant denials.</p>
+<p>The source guide defines F-01–F-40 as planned coverage. This article maps all categories without claiming execution. Each future report needs a known-good digest, actual versions/profile/AZs, baseline, scoped injection/abort/restoration plan, UTC detection/diagnosis/recovery times, sanitized discriminating evidence and at least one rejected alternative cause.</p>
+<ul>
+<li>Record the bounded fix, rerun the original reproduction, and check forbidden paths and business correctness.</li>
+<li>Restore the baseline; record prevention ownership, residual uncertainty and actual cost.</li>
+<li>Stop if the approved dev scope changes, shared resources appear, data-loss risk is unknown or cost/impact exceeds bounds. Destructive injections need their own concrete approved scope.</li>
+</ul>
+<p>Graduation calls for at least 30 distinct drills and 12 full incident reports with composite incidents, plus timed recovery and an upgrade rehearsal. These articles run no injections, diagnostics, AWS calls or EKS tests. Their verified artifact is educational content, not a platform health report.</p></section><footer><a href="#top">Back to top</a></footer></main></body>
+</html>
+
