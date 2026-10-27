@@ -1,5 +1,6 @@
 /* Article-only presentation; shared reader styles own typography and themes. */
 .demo { margin: 0 0 28px; }
+.demo h2 { border-top: 0; padding-top: 0; }
 .demo-video { display: block; width: 100%; height: auto; max-height: 75vh; border: 1px solid #71877e; border-radius: 8px; background: #1b2023; }
 .demo-caption, .source-note { font-size: 11px; opacity: .85; }
 .demo-caption { margin-top: 10px; }
