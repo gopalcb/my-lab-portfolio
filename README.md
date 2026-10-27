@@ -26,6 +26,10 @@ switch or stored theme preference; older dark-mode preferences are ignored.
 The shell uses light styles directly, and every isolated document loads
 `public/read/light.css` for light tables and diagrams with matte dark code panels.
 
+Articles and About me enter with a 240ms fade and a 6px upward movement. The
+sidebar stays in place, with short color transitions on navigation hover. These
+effects run only when `prefers-reduced-motion: no-preference` is enabled.
+
 ## Add a project or reading
 
 1. Create a complete static HTML document with `html`, `head`, `body`, and `h1` in
