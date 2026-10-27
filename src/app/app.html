@@ -28,7 +28,7 @@
   @if (state().document; as document) {
     <iframe class="content-frame" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" [srcdoc]="document" [title]="state().selected?.title ?? 'Portfolio content'"></iframe>
   } @else {
-    <section class="message" aria-live="polite">
+    <section class="message" [class.page-enter]="state().phase === 'ready'" aria-live="polite">
       @switch (state().phase) {
         @case ('loading-list') { <p role="status">Loading titles…</p> }
         @case ('loading-content') { <p role="status">Loading {{ state().selected?.title }}…</p> }
