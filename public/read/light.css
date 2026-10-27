@@ -14,7 +14,7 @@ html[data-portfolio-theme="light"] h3 {
   font-weight: 600 !important;
   letter-spacing: -.02em !important;
   line-height: 1.45 !important;
-  text-transform: none !important;
+  text-transform: uppercase !important;
 }
 html[data-portfolio-theme="light"] h1.breadcrumb,
 html[data-portfolio-theme="light"] .breadcrumb {

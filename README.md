@@ -139,7 +139,8 @@ apply both in the portfolio and when the article is opened directly.
 
 The demo uses a native HTML video player with controls, inline mobile playback and
 metadata-only preload. `public/projects/assets/visual-agent-builder/runtime-controller-demo.mp4`
-is a web export of the supplied October 26 recording. The original MOV stays local.
+is a 720p H.264 web export of the supplied October 27 `runtime-agent-demo.mp4`
+recording, replacing the previous demo. The original export stays local.
 The reader CSP permits only this bundled media URL; scripts, nested frames,
 network APIs and same-origin sandbox permissions remain disabled. To replace the
 video, export a compatible MP4 at the same path and verify playback and seeking

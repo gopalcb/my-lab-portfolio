@@ -12,28 +12,27 @@
 <main>
 <header class="project-header"><h1 class="breadcrumb">MY LAB / RUNTIME CONTROLLER</h1><a class="repository-link" href="https://github.com/gopalcb/agent-runtime-controller" target="_blank" rel="noopener noreferrer">PROJECT GITHUB REPOSITORY</a></header>
 <section class="demo" aria-labelledby="demo-title">
-  <h2 id="demo-title">See Runtime Controller in action</h2>
+  <h2 id="demo-title">Using Runtime Controller to improve itself</h2>
   <video class="demo-video" controls playsinline preload="metadata" aria-labelledby="demo-title" aria-describedby="demo-caption">
     <source src="assets/visual-agent-builder/runtime-controller-demo.mp4" type="video/mp4">
     Your browser does not support embedded video. Open the recording using the link below.
   </video>
-  <p id="demo-caption" class="demo-caption">Watch the Runtime Controller walkthrough. <a href="assets/visual-agent-builder/runtime-controller-demo.mp4" target="_blank" rel="noopener noreferrer">Open the video in a new tab</a>.</p>
+  <p id="demo-caption" class="demo-caption">See how I use Runtime Controller to guide changes to its own interface. <a href="assets/visual-agent-builder/runtime-controller-demo.mp4" target="_blank" rel="noopener noreferrer">Open the video in a new tab</a>.</p>
 </section>
 
 <section id="overview">
 <h2>What I built, and why</h2>
-<p class="lede">Runtime Controller turns visual feedback into project-specific coding work. A developer draws a region on a blank canvas or selects an element in a running local application, describes the change, and saves it as a work item. The controller sends selected items to Codex, keeps the run history, and brings the result back into the same interface.</p>
-<p>The problem is the gap between seeing a UI problem and explaining it precisely to a coding agent. “Move this panel” loses its meaning when the agent cannot see which panel, where it sits, or how large the viewport was. This project carries that context with the request: coordinates, viewport dimensions and, for an existing element, its selector, text, HTML and selected styles.</p>
-<p>It also gives the work a place to live. Instructions survive a browser refresh, each run keeps its own copy of the inputs, and completed work stays available in history. Project settings, installation progress and recorded usage are visible alongside the work.</p>
-<p>The stack is Angular for the interface, NestJS for the local API, Playwright for controlled capture windows, the Codex app-server for agent execution, and Python for installation and portable project tooling. Project state is stored in JSON files; there is no application database or cloud queue in this implementation.</p>
+<p class="lede">My initial plan was to build a small agentic application that runs on localhost, with a UI for organizing the documents agents generated for my learning. These included implementation details, code snippets and reusable functions. I wanted to find the right document, decide what was worth keeping as memory, and refer to useful documents in an agent prompt.</p>
+<p>As I worked on it, I found that automating prompts through an interactive application could give agents clearer direction and make repeated tasks easier to run. Visual prompts made the instructions more precise: I could point to the part of the application I wanted to change and explain what should happen there.</p>
+<p>In many cases, working directly with the target on screen reduced the effort needed to describe the task. That became the idea behind Runtime Controller: select an area or element, describe the change, send the work to an agent, and review the result. I now use that same workflow to improve Runtime Controller itself.</p>
 </section>
 
 <section id="architecture">
 <h2>The architecture, from the developer’s point of view</h2>
-<p>Think of the NestJS process as the owner of one selected project. The UI asks it to capture, save or execute work. The process keeps the project’s store, agent runtime, capture browsers and installation worker together in one session. Changing the project replaces that session rather than just changing a label in the UI.</p>
+<p>Think of the NestJS process as the coordinator for one selected project. The UI asks it to capture a visual reference, save an instruction or run the work. It keeps the project’s saved state, agent runtime, capture browsers and installation worker together in one session. When you switch projects, it closes the old session and opens one for the new project.</p>
 <figure class="runtime-mermaid" aria-labelledby="architecture-title">
 <h3 id="architecture-title">From visual intent to a saved result</h3>
-<p>Follow the solid arrows down through the request. The side branches show where the work is saved and where Codex changes application files. The UI reads saved state back; a developer still reviews the changes and checks.</p>
+<p>Follow the solid arrows from your visual instruction to the saved result. The branches show where the controller saves progress and where Codex edits the application files. The UI reads the saved state to show what happened. You then review the changes and check that they work as intended.</p>
 <div class="scroll mermaid-diagram" tabindex="0" role="region" aria-label="Mermaid architecture diagram; scroll horizontally on narrow screens">
 <img src="assets/visual-agent-builder/request-to-result.svg" alt="Flow from visual capture to a saved instruction, execution validation, immutable run snapshot, Codex thread and turn, notification processing, persisted state and UI review. Codex edits project files directly; the UI polls saved state every two seconds.">
 </div>
