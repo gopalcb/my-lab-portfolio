@@ -50,7 +50,7 @@ describe('Portfolio route state', () => {
     const links = [...harness.routeNativeElement!.querySelectorAll('.item-list a')];
     expect(links).toHaveLength(4);
     expect(links[0].textContent).toContain('Runtime Controller');
-    expect(links[0].getAttribute('href')).toContain('/projects/visual-agent-builder');
+    expect(links[0].getAttribute('href')).toContain('/projects/runtime-controller');
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toContain('Runtime Controller');
     expect(links[1].textContent).toContain('What Burning 436M Tokens Taught Me');
     expect(links[1].getAttribute('href')).toContain('/projects/what-burning-436m-tokens-taught-me');
@@ -59,6 +59,15 @@ describe('Portfolio route state', () => {
     expect(links[3].textContent).toContain('Customizing agents and runtime');
     expect(harness.routeNativeElement!.querySelector('.site-nav')?.textContent).toContain('My lab');
     expect(harness.routeNativeElement!.querySelector('.site-nav a[href="/read"]')).toBeNull();
+  });
+
+  it('redirects the previous Runtime Controller URL to its renamed route', async () => {
+    configure();
+    const harness = await RouterTestingHarness.create();
+    const page = await harness.navigateByUrl('/projects/visual-agent-builder', PortfolioPage);
+    expect(TestBed.inject(Router).url).toBe('/projects/runtime-controller');
+    expect(page.state().selected?.id).toBe('runtime-controller');
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('Runtime Controller');
   });
 
   it('redirects the previous token article URL to its renamed route', async () => {

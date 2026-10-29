@@ -7,7 +7,7 @@ const output = new URL('dist/my-work-portfolio/browser/', root);
 const catalogSource = await readFile(new URL('src/app/content/content.catalog.ts', root), 'utf8');
 const compiled = ts.transpileModule(catalogSource, { compilerOptions: { module: ts.ModuleKind.ES2022 } }).outputText;
 const { LOCAL_CATALOG } = await import(`data:text/javascript;base64,${Buffer.from(compiled).toString('base64')}`);
-const routes = ['projects', 'read', 'about-me', 'my-works', 'projects/aws-observability-redice', 'projects/agent-workflow-token-experiment', 'read/linux-essentials'];
+const routes = ['projects', 'read', 'about-me', 'my-works', 'projects/aws-observability-redice', 'projects/agent-workflow-token-experiment', 'projects/visual-agent-builder', 'read/linux-essentials'];
 for (const kind of ['projects', 'read']) {
   for (const item of LOCAL_CATALOG[kind]) {
     if (!/^[a-z0-9-]+$/.test(item.id)) throw new Error(`Unsafe route ID: ${item.id}`);
