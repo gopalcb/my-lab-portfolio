@@ -1,8 +1,8 @@
 <a class="skip" href="#content-area" (click)="$event.preventDefault(); contentArea.focus()">Skip to content</a>
 <aside class="sidebar">
   <nav class="site-nav" aria-label="Main navigation">
-    <a routerLink="/projects" [attr.aria-current]="state().kind === 'projects' ? 'page' : null">My lab</a>
-    <a routerLink="/about-me" [attr.aria-current]="state().kind === 'about' ? 'page' : null">About me</a>
+    <a data-track-id="projects-menu" data-track-title="My lab" routerLink="/projects" [attr.aria-current]="state().kind === 'projects' ? 'page' : null">My lab</a>
+    <a data-track-id="about-menu" data-track-title="About Me" routerLink="/about-me" [attr.aria-current]="state().kind === 'about' ? 'page' : null">About me</a>
   </nav>
   <section class="item-navigation" aria-label="Content list">
     @if (state().kind === 'projects' || state().kind === 'read') {
@@ -12,7 +12,7 @@
           @if (state().kind === 'read' && ($index === 0 || item.topic !== visibleItems()[$index - 1].topic)) {
             <p class="nav-label topic-label">{{ item.topic ?? 'DEV NOTES' }}</p>
           }
-          <a [routerLink]="['/', state().kind, item.id]" [attr.aria-current]="state().selected?.id === item.id ? 'page' : null" [title]="item.summary">{{ item.title }}</a>
+          <a [attr.data-track-id]="'content-' + item.id" [attr.data-track-title]="item.title" [routerLink]="['/', state().kind, item.id]" [attr.aria-current]="state().selected?.id === item.id ? 'page' : null" [title]="item.summary">{{ item.title }}</a>
         }
       </nav>
       @if (state().phase === 'loading-list') { <p class="list-status" role="status">Loading titles…</p> }
@@ -25,8 +25,12 @@
   </div>
 </aside>
 <main #contentArea id="content-area" tabindex="-1" [attr.aria-busy]="state().phase === 'loading-content' || state().phase === 'loading-list'">
-  @if (state().document; as document) {
-    <iframe class="content-frame" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" [srcdoc]="document" [title]="state().selected?.title ?? 'Portfolio content'"></iframe>
+  @if (state().document && (state().phase === 'loading-list' || state().phase === 'loading-content')) { <p role="status">Loading {{ state().selected?.title ?? 'content' }}…</p> }
+  @if (state().document && (state().phase === 'content-error' || state().phase === 'catalog-error')) { <p role="alert">This page couldn’t be loaded. <button (click)="retry()">Try again</button></p> }
+  @if (state().document) {
+    @for (view of frameViews(); track view.id) {
+    <iframe #contentFrame class="content-frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" [srcdoc]="view.html" [title]="view.title ?? 'Portfolio content'"></iframe>
+    }
   } @else {
     <section class="message" [class.page-enter]="state().phase === 'ready'" aria-live="polite">
       @switch (state().phase) {

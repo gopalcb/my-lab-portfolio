@@ -7,6 +7,8 @@ import { PortfolioPage } from './portfolio-page';
 import { ContentService } from './content/content.service';
 import { LOCAL_CATALOG } from './content/content.catalog';
 import { ContentItem, ContentKind } from './content/content.models';
+import { vi } from 'vitest';
+import { PortfolioApi } from './content/portfolio-api.service';
 import { SafeHtml } from '@angular/platform-browser';
 
 const service = {
@@ -15,16 +17,15 @@ const service = {
 };
 
 function configure(overrides: Partial<typeof service> = {}) {
-  TestBed.configureTestingModule({ providers: [...appConfig.providers, { provide: ContentService, useValue: { ...service, ...overrides } }] });
+  TestBed.configureTestingModule({ providers: [...appConfig.providers, { provide: ContentService, useValue: { ...service, ...overrides, displayed: undefined } }, { provide: PortfolioApi, useValue: { log: vi.fn(), payload: vi.fn((...args) => args) } }] });
 }
 
 describe('Portfolio route state', () => {
-  it('shows the supplied profile and opens profile links in separate tabs', async () => {
+  it('opens About through content delivery and profile links in separate tabs', async () => {
     configure();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/about-me', PortfolioPage);
-    expect(harness.routeNativeElement!.querySelector('.message h1')?.textContent).toBe('Gopal C Bala');
-    expect(harness.routeNativeElement!.querySelector('.message p')?.textContent).toBe('gopalcb · he/him');
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('About Me');
     const links = [...harness.routeNativeElement!.querySelectorAll('.sidebar-social a')];
     expect(links.map(link => link.getAttribute('href'))).toEqual(['https://github.com/gopalcb', 'https://www.linkedin.com/in/gopal-c-bala']);
     for (const link of links) {
@@ -42,18 +43,20 @@ describe('Portfolio route state', () => {
     expect(harness.routeNativeElement!.querySelector('iframe')).not.toBeNull();
   });
 
-  it('shows My lab with three projects and OpenTelemetry second', async () => {
+  it('shows My lab with the token-workflow article second', async () => {
     configure();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects', PortfolioPage);
     const links = [...harness.routeNativeElement!.querySelectorAll('.item-list a')];
-    expect(links).toHaveLength(3);
+    expect(links).toHaveLength(4);
     expect(links[0].textContent).toContain('Runtime Controller');
     expect(links[0].getAttribute('href')).toContain('/projects/visual-agent-builder');
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toContain('Runtime Controller');
-    expect(links[1].textContent).toContain('OpenTelemetry implementation lab');
-    expect(links[1].getAttribute('href')).toContain('/projects/aws-observability');
-    expect(links[2].textContent).toContain('Customizing agents and runtime');
+    expect(links[1].textContent).toContain('Do More Agents Mean Better Work?');
+    expect(links[1].getAttribute('href')).toContain('/projects/agent-workflow-token-experiment');
+    expect(links[2].textContent).toContain('OpenTelemetry implementation lab');
+    expect(links[2].getAttribute('href')).toContain('/projects/aws-observability');
+    expect(links[3].textContent).toContain('Customizing agents and runtime');
     expect(harness.routeNativeElement!.querySelector('.site-nav')?.textContent).toContain('My lab');
     expect(harness.routeNativeElement!.querySelector('.site-nav a[href="#/read"]')).toBeNull();
   });
@@ -70,13 +73,13 @@ describe('Portfolio route state', () => {
     configure();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects/my-customized-agents-and-runtime', PortfolioPage);
-    expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(3);
+    expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(4);
     expect(harness.routeNativeElement!.querySelector('.item-list [aria-current]')?.textContent).toContain('Customizing agents and runtime');
     await harness.navigateByUrl('/read/kubernetes-networking', PortfolioPage);
     expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(9);
     expect(harness.routeNativeElement!.querySelectorAll('.item-list [aria-current]')).toHaveLength(1);
     expect(harness.routeNativeElement!.querySelector('.item-list [aria-current]')?.textContent).toContain('Kubernetes networking');
-    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('sandbox')).toBe('allow-popups allow-popups-to-escape-sandbox');
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('sandbox')).toBe('allow-scripts allow-popups allow-popups-to-escape-sandbox');
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toContain('Kubernetes networking');
   });
 
@@ -150,5 +153,134 @@ describe('Portfolio route state', () => {
       if (previous === null) localStorage.removeItem('my-work-portfolio-theme');
       else localStorage.setItem('my-work-portfolio-theme', previous);
     }
+  });
+});
+
+describe('Portfolio API route integration', () => {
+  const html = '<html><body><h1>Content</h1></body></html>';
+  async function configureApi() {
+    const { PORTFOLIO_ENDPOINT, PORTFOLIO_FETCH } = await import('./content/portfolio-api.service');
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => {
+      const payload = JSON.parse(init.body as string);
+      return { ok: true, json: async () => payload.get_project ? { html, project: payload.get_project, content_type: 'text/html; charset=utf-8' } : {} } as Response;
+    });
+    TestBed.configureTestingModule({ providers: [...appConfig.providers,
+      { provide: PORTFOLIO_ENDPOINT, useValue: 'https://api.example.test/gb-portfolio/get-content' },
+      { provide: PORTFOLIO_FETCH, useValue: fetch },
+    ] });
+    return fetch;
+  }
+
+  it('redirects home to its first project with a single project_open and no fabricated click/home event', async () => {
+    const fetch = await configureApi();
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/', PortfolioPage);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    expect(TestBed.inject(Router).url).toBe('/projects');
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'Runtime Controller', page_path: '/projects' });
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('sandbox')).not.toContain('allow-same-origin');
+  });
+
+  it('records unknown project routes once without fetching content or duplicating on retry', async () => {
+    const fetch = await configureApi();
+    const harness = await RouterTestingHarness.create();
+    const page = await harness.navigateByUrl('/projects/unknown-project', PortfolioPage);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'page_view', get_project: '', page_path: '/projects/unknown-project' });
+    expect(harness.routeNativeElement!.querySelector('iframe')).toBeNull();
+    page.retry();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('sends separate same-session click and About content events and navigates while click logging is pending', async () => {
+    const fetch = await configureApi();
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/projects', PortfolioPage);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    // This unresolved analytics response must not block About content delivery.
+    const original = fetch.getMockImplementation()!;
+    let finishLog!: (response: Response) => void;
+    fetch.mockImplementation((url, init) => {
+      const payload = JSON.parse(init.body as string);
+      return payload.event_type === 'element_clicked' ? new Promise<Response>(resolve => { finishLog = resolve; }) : original(url, init);
+    });
+    (harness.routeNativeElement!.querySelector('.site-nav a[href="#/about-me"]') as HTMLAnchorElement).click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    const events = fetch.mock.calls.slice(1).map(call => JSON.parse(call[1].body as string));
+    expect(events).toHaveLength(2);
+    const click = events.find(event => event.event_type === 'element_clicked');
+    const content = events.find(event => event.get_project === 'About Me');
+    expect(click).toMatchObject({ target: 'About Me', action: 'nav', get_project: '' });
+    expect(content).toMatchObject({ action: '', target: '', event_type: 'page_view' });
+    expect(click.session).toBe(content.session);
+    expect(click.event_id).not.toBe(content.event_id);
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('About Me');
+    finishLog({ ok: true, json: async () => ({}) } as Response);
+  });
+
+  it('captures native route clicks before target handlers and removes listeners on route teardown', async () => {
+    const fetch = await configureApi();
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/projects', PortfolioPage);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    const oldAboutLink = harness.routeNativeElement!.querySelector('.site-nav a[href="#/about-me"]') as HTMLAnchorElement;
+    // Model target-side handling that prevents the old component's host bubble listener.
+    oldAboutLink.addEventListener('click', event => event.stopPropagation());
+    oldAboutLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    expect(TestBed.inject(Router).url).toBe('/about-me');
+    const labLink = harness.routeNativeElement!.querySelector('.site-nav a[href="#/projects"]') as HTMLAnchorElement;
+    labLink.addEventListener('click', event => event.stopPropagation());
+    labLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    expect(TestBed.inject(Router).url).toBe('/projects');
+    const events = fetch.mock.calls.slice(1).map(call => JSON.parse(call[1].body as string));
+    expect(events.map(event => event.event_type)).toEqual(['element_clicked', 'page_view', 'element_clicked', 'project_open']);
+    expect(events[0]).toMatchObject({ target: 'About Me', page_path: '/projects', metadata: { element_id: 'about-menu' } });
+    expect(events[2]).toMatchObject({ target: 'My lab', page_path: '/about-me', metadata: { element_id: 'projects-menu' } });
+    expect(new Set(events.map(event => event.session)).size).toBe(1);
+    expect(new Set(events.map(event => event.event_id)).size).toBe(4);
+    const count = fetch.mock.calls.length;
+    // Detached nodes from a destroyed route must no longer own analytics listeners.
+    oldAboutLink.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }));
+    await new Promise(resolve => setTimeout(resolve, 0));
+    expect(fetch).toHaveBeenCalledTimes(count);
+  });
+
+  it('keeps the visible document through failed navigation and sends the exact failed payload on retry', async () => {
+    const fetch = await configureApi();
+    const harness = await RouterTestingHarness.create();
+    await harness.navigateByUrl('/projects/visual-agent-builder', PortfolioPage);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    const oldFrame = harness.routeNativeElement!.querySelector('iframe')!;
+    const oldDocument = oldFrame.getAttribute('srcdoc');
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) } as Response);
+    await harness.navigateByUrl('/projects/aws-observability', PortfolioPage);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    expect(harness.routeNativeElement!.querySelector('iframe')!.getAttribute('srcdoc')).toBe(oldDocument);
+    expect(harness.routeNativeElement!.querySelector('iframe')).toBe(oldFrame);
+    expect(harness.routeNativeElement!.textContent).toContain('This page couldn’t be loaded.');
+    const failedBody = fetch.mock.calls[1][1].body;
+    (harness.routeNativeElement!.querySelector('button') as HTMLButtonElement).click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    harness.detectChanges();
+    const retry = fetch.mock.calls.find((call, index) => index > 1 && JSON.parse(call[1].body as string).get_project === 'OpenTelemetry implementation lab');
+    expect(retry?.[1].body).toBe(failedBody);
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('OpenTelemetry implementation lab');
+    expect(harness.routeNativeElement!.querySelector('iframe')).not.toBe(oldFrame);
+    expect(oldFrame.isConnected).toBe(false);
   });
 });

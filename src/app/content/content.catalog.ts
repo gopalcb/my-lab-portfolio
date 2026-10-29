@@ -1,8 +1,7 @@
 import { ContentItem, ContentKind, ContentSettings } from './content.models';
 
 export const CONTENT_SETTINGS: ContentSettings = {
-  catalogApiBaseUrl: null,
-  contentOrigins: [],
+  endpoint: 'https://d10qhbfu5fjd8s.cloudfront.net/gb-portfolio/get-content',
 };
 
 // Temporarily hidden from navigation; documents and direct links remain available.
@@ -11,6 +10,7 @@ export const HIDDEN_PROJECT_IDS = new Set(['glue-fuzzy-matcher', 'eks-microservi
 export const LOCAL_CATALOG: Record<ContentKind, readonly ContentItem[]> = {
   projects: [
     { id: 'visual-agent-builder', title: 'Runtime Controller', summary: 'From visual instructions to project-scoped Codex execution, saved results and run history.', htmlUrl: 'projects/visual-agent-builder.html' },
+    { id: 'agent-workflow-token-experiment', title: 'Do More Agents Mean Better Work?', summary: 'A measured audit of agent token usage, repeated context and the limits of workflow complexity.', htmlUrl: 'projects/agent-workflow-token-experiment.html' },
     { id: 'aws-observability', title: 'OpenTelemetry implementation lab', summary: 'A staged OpenTelemetry lab for tracing services, logs, metrics, and failure evidence.', htmlUrl: 'projects/aws-observability.html' },
     { id: 'my-customized-agents-and-runtime', title: 'Customizing agents and runtime', summary: 'Personal workflows, tools and validation around Codex.', htmlUrl: 'projects/agents-and-runtime.html' },
     { id: 'glue-fuzzy-matcher', title: 'Glue fuzzy matcher pipeline', summary: 'A provisional Spark and RapidFuzz matching architecture.', htmlUrl: 'projects/glue-fuzzy-matcher.html' },

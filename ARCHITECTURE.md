@@ -1,60 +1,63 @@
-# Portfolio content boundary
+# Portfolio frontend boundary
 
 ```mermaid
 flowchart LR
-    R[Angular hash route: kind / id] --> P[Shared portfolio page]
+    R[Angular hash route] --> P[PortfolioPage]
+    P --> C[Typed local catalog]
     P --> S[ContentService]
-    S -->|default| L[Local JS object catalog]
-    S -. configured .-> A[GET catalog API /projects or /read]
-    L --> V[Validate IDs, fields, approved HTML URL]
-    A --> V
-    V --> H[HttpClient GET HTML as text]
-    H --> I[First CSP + asset base]
-    I --> F[Sandboxed srcdoc iframe]
-    P --> N[Left title list and selection]
+    S -->|Project or About title| A[PortfolioApi: JSON POST]
+    S -->|Dev note only| L[Frontend HTML GET]
+    A --> CF[CloudFront / HTTP API / Lambda]
+    CF --> D[Private S3 HTML and DynamoDB events]
+    S --> I[Validated opaque srcdoc document]
+    I --> F[Frontend assets and nonce-bound tracking bridge]
+    F -->|Validated postMessage| P
+    P -->|Click / video event| A
 ```
 
-`content.models.ts` defines the shared metadata/config contract.
-`content.catalog.ts` supplies the current fixtures and deployment configuration.
-`ContentService` switches fixture/API catalogs, validates them, fetches documents
-and constructs the isolated viewer input. `PortfolioPage` maps the route to
-catalog/content state, cancels obsolete requests, updates titles and handles
-loading, retry, empty/missing/error states. A new item is content plus metadata;
-no component or route definition is required for each item.
+`content.catalog.ts` owns the static title/route inventory and public endpoint.
+`content.models.ts` defines that contract. `portfolio-api.service.ts` owns tab
+sessions, typed event construction, bounded POST requests, retries and independent
+logging. No browser code has AWS credentials or the origin header secret.
 
-The application owns navigation/selection/status; standalone HTML owns its
-presentation. Script execution, same-origin parent access, form submission,
-embedded frames and top navigation remain disabled. User-activated source links
-can open independent tabs. See README for CSP, CORS and approved-origin setup.
+`PortfolioPage` resolves routes, updates the page title, discards obsolete
+responses, preserves the last successful view during loading/failure, and offers
+retry. A capture-phase host listener records clicks before Angular navigation;
+it is removed on destruction. Native keyboard link activation is the same click,
+not a second event. Direct routes/back/refresh request content without fabricated
+clicks. Root redirects to the first project, whose content request is its view event.
 
-No backend service, S3 resource or EKS implementation is part of this application.
-The older static portfolio is kept for provenance rather than used as a runtime
-fallback. Project HTML/assets are copied into the Angular build by the existing
-public asset configuration. Read articles are maintained separately in public/read.
+`ContentService` validates API content responses and builds the isolated document.
+Project/About content comes only from the POST endpoint. Read articles still use
+frontend GET plus a logging-only page view. The complete original payload is
+retained for retry, including event ID, session, client timestamp and metadata.
 
-Readings share `public/read/reading.css` and statically highlighted, script-free code panels. The catalog publishes nine Dev notes; Linux essentials is integrated into the EKS implementation/delivery article. Its former Angular route redirects to the merged document; the former static HTML URL provides a redirect link. Dev note figures are semantic HTML resource groups with CSS flows/parallel branches, responsive single-column stacking, and no image or Mermaid rendering dependency. Their naming/ports/paths follow the EKS lab implementation-resource-map.md contract. The Dev notes menu retains /read routes for link compatibility.
+`tracking-bridge.ts` contains the only script allowed in the opaque iframe. The
+loader strips fetched scripts and event handlers, injects a fresh nonce/CSP, and
+never grants `allow-same-origin`. Parent message validation requires the current
+frame window, origin `null`, matching document ID/channel and bounded event fields.
+The bridge handles links, CSS tab controls and actual video playback transitions.
+A frontend-injected Play/Pause button provides observable click events; browser-owned
+media-control clicks are not exposed to JavaScript and are never fabricated.
+The content cannot call the API itself. External navigation remains native and
+analytics delivery is best effort. Images/styles/media stay frontend-owned; only
+the bundled demo video is permitted by the media policy.
 
-The content contract optionally accepts a nonempty `topic` string. ContentService validates/preserves it; the sidebar labels contiguous article groups while the same ID-based routes and HTTP loader remain in use. The catalog contains six project pages and nine Dev notes. Bedrock documentation is a proposed adapter, not a callable feature of this static portfolio or the current local dispatcher.
+The seven project documents and About HTML, infrastructure, backend tests and
+content checks now belong to the sibling `gb-portfolio-aws` project. Its stack
+creates private versioned S3, retained DynamoDB with expiring events, Lambda,
+HTTP API and a no-cache CloudFront distribution. The public API serves owner-authored
+HTML to any visitor; private storage is not content authentication. Approximate
+geolocation and anonymous tab sessions do not identify a verified person.
 
-The EKS project document adds a locally styled AWS boundary map: global DNS, managed control plane, customer VPC/subnet tiers, workers, pods and containers, with separate request/response, async and control relationships. `public/projects/eks-architecture.css` is scoped to this document; resource/HTTP assumptions are maintained in the EKS lab walkthrough.
+The frontend retains seven project catalog entries and nine Dev notes. Three project
+entries and the Dev notes menu are temporarily hidden; direct routes remain.
+Reading CSS, light theme overrides, source Mermaid files and SVGs remain here.
+Article examples still describe their own projects; proposed Bedrock or EKS
+features in those articles are not implemented portfolio services.
 
-The agents/runtime article is a continuous document styled by
-`public/projects/agents-runtime.css`. It preserves the four existing runtime
-Mermaid diagrams and adds a proposed memory read/write diagram. Embedded Python
-examples describe boto3/Bedrock embeddings and managed OpenSearch document
-retrieval; they are documentation, not executed application code. No memory
-export, AWS client or vector backend is wired into the portfolio runtime.
-
-Runtime Controller is the first project entry. Its standalone article documents
-the sibling visual-agent-builder implementation using source excerpts and labeled
-illustrative payloads. It uses shared reading CSS and an opening native HTML video player. The bundled
-MP4 is a 1280-pixel-wide export of the supplied screen recording, with metadata preload and
-user-initiated playback. The reader CSP permits only that exact media URL; script,
-network API, nested-frame and sandbox restrictions remain in place.
-
-The portfolio is light-only: the shell no longer reads theme localStorage or
-exposes a theme switch. ContentService always marks its isolated document light
-and includes the same-origin `read/light.css` stylesheet. Existing iframe/CSP
-boundaries remain intact. Runtime Controller includes a pre-rendered Mermaid
-SVG with an adjacent editable .mmd source, and its standalone HTML loads the
-same light stylesheet. Table backgrounds and syntax colors share that palette.
+Frontend tests cover payload/session/retry semantics, navigation, document
+validation, iframe message isolation and event handling. Supplemental headless
+checks and native Computer Use evidence are recorded separately from unit tests.
+The existing GitHub Pages workflow publishes a selected source revision after
+frontend tests/build; infrastructure deployment remains outside this repository.

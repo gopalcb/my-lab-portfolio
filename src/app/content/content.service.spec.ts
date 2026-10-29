@@ -4,116 +4,107 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { DomSanitizer } from '@angular/platform-browser';
 import { SecurityContext } from '@angular/core';
 import { vi } from 'vitest';
-import { CONTENT_CONFIG, ContentService } from './content.service';
-import { ContentItem, ContentSettings } from './content.models';
+import { ABOUT_ITEM, ContentService } from './content.service';
+import { ContentItem } from './content.models';
+import { PORTFOLIO_ENDPOINT, PORTFOLIO_FETCH, PortfolioApi } from './portfolio-api.service';
 
 const item: ContentItem = { id: 'sample', title: 'Sample', summary: 'Example content', htmlUrl: 'projects/sample.html' };
 const html = '<!doctype html><html><head><title>Sample</title></head><body><h1 id="sample">Sample</h1><a href="#sample">Contents</a></body></html>';
-
-function setup(config: ContentSettings = { catalogApiBaseUrl: null, contentOrigins: [] }) {
-  TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: CONTENT_CONFIG, useValue: config }] });
-  return { service: TestBed.inject(ContentService), http: TestBed.inject(HttpTestingController) };
+const response = (value: unknown) => ({ ok: true, json: async () => value }) as Response;
+function setup() {
+  const fetch = vi.fn().mockResolvedValue(response({ project: 'Sample', content_type: 'text/html; charset=utf-8', html }));
+  TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(),
+    { provide: PORTFOLIO_ENDPOINT, useValue: 'https://api.example.test/gb-portfolio/get-content' },
+    { provide: PORTFOLIO_FETCH, useValue: fetch },
+  ] });
+  return { service: TestBed.inject(ContentService), http: TestBed.inject(HttpTestingController), fetch };
 }
+const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 describe('ContentService', () => {
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
-  it('returns distinct local object catalogs without making list requests', () => {
-    const { service } = setup();
-    service.list('projects').subscribe(items => expect(items).toHaveLength(6));
+  it('uses local catalogs and never fetches project or About HTML directly', async () => {
+    const { service, fetch } = setup();
+    service.list('projects').subscribe(items => expect(items).toHaveLength(7));
     service.list('read').subscribe(items => expect(items).toHaveLength(9));
+    service.load(item, false, 'document', '/projects/sample').subscribe();
+    await settle();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const request = JSON.parse(fetch.mock.calls[0][1].body);
+    expect(request.get_project).toBe('Sample');
+    expect(request.event_type).toBe('project_open');
+    fetch.mockResolvedValue(response({ project: 'About Me', content_type: 'text/html', html }));
+    service.load(ABOUT_ITEM).subscribe();
+    await settle();
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ get_project: 'About Me', event_type: 'page_view' });
   });
 
-  it('supports the future API contract and an explicitly approved HTTPS content origin', () => {
-    const { service, http } = setup({ catalogApiBaseUrl: '/api/content', contentOrigins: ['https://content.example.com'] });
-    service.list('projects').subscribe(items => expect(items[0].htmlUrl).toBe('https://content.example.com/sample.html'));
-    http.expectOne('/api/content/projects').flush([{ ...item, htmlUrl: 'https://content.example.com/sample.html' }]);
+  it('removes fetched executable markup and grants only its nonce bridge script access', async () => {
+    const { service, fetch } = setup();
+    fetch.mockResolvedValue(response({ project: 'Sample', content_type: 'text/html', html: html.replace('</body>', '<script nonce="evil">alert(1)</script><img onerror="alert(2)" src="bad"><base href="https://evil.test"><iframe src="https://evil.test"></iframe></body>') }));
+    let text = '';
+    service.load(item, false, 'current-document').subscribe(value => { text = TestBed.inject(DomSanitizer).sanitize(SecurityContext.HTML, value)!; });
+    await settle();
+    expect(text).not.toContain('alert(');
+    expect(text).not.toContain('onerror');
+    expect(text).not.toContain('evil.test');
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    expect(doc.querySelectorAll('script')).toHaveLength(1);
+    const nonce = doc.querySelector('script')!.getAttribute('nonce');
+    expect(text).toContain(`script-src 'nonce-${nonce}'`);
+    expect(text).toContain("connect-src 'none'");
+    expect(text).toContain("frame-src 'none'");
+    expect(doc.querySelector('base')!.href).toBe(new URL(item.htmlUrl, document.baseURI).href);
+    expect(text).toContain('read/light.css');
+    expect(text).toContain('href="about:srcdoc#sample"');
+    expect(text).toContain('current-document');
   });
 
-  it('preserves an optional API topic without requiring it from older catalogs', () => {
-    const { service, http } = setup({ catalogApiBaseUrl: '/api/content', contentOrigins: [] });
-    service.list('read').subscribe(items => {
-      expect(items[0].topic).toBe('CODEX WORKSPACE');
-      expect(items[1].topic).toBeUndefined();
-    });
-    http.expectOne('/api/content/read').flush([{ ...item, topic: ' CODEX WORKSPACE ' }, { ...item, id: 'older-item' }]);
+  it.each([{}, { html: '' }, { html: '<h1>fragment</h1>' }, { html: '<html><body><app-root></app-root><h1>Fallback</h1></body></html>' }, { project: 'Wrong', html }])('rejects invalid API content without replacing the current document: %j', async value => {
+    const { service, fetch } = setup();
+    fetch.mockResolvedValue(response({ project: 'Sample', content_type: 'text/html', ...value }));
+    const failed = vi.fn();
+    const rendered = vi.fn();
+    service.load(item).subscribe({ next: rendered, error: failed });
+    await settle();
+    expect(failed).toHaveBeenCalledOnce();
+    expect(rendered).not.toHaveBeenCalled();
   });
 
-  it.each([
-    { body: {} },
-    { body: [{ ...item }, { ...item }] },
-    { body: [{ ...item, id: '../escape' }] },
-    { body: [{ ...item, title: '' }] },
-    { body: [{ ...item, topic: 42 }] },
-    { body: [{ ...item, topic: ' ' }] },
-    { body: [{ ...item, htmlUrl: 'https://unapproved.example/sample.html' }] },
-    { body: [{ ...item, htmlUrl: 'javascript:alert(1)' }] },
-    { body: [{ ...item, htmlUrl: 'data:text/html,<h1>bad</h1>' }] },
-  ])('rejects malformed or unsafe API metadata: $body', ({ body }) => {
-    const { service, http } = setup({ catalogApiBaseUrl: '/api/content', contentOrigins: [] });
-    let failed = false;
-    service.list('read').subscribe({ error: () => { failed = true; } });
-    http.expectOne('/api/content/read').flush(body);
-    expect(failed).toBe(true);
+  it('preserves the entire request for manual retry but renews a subsequent navigation event', async () => {
+    const { service, fetch } = setup();
+    fetch.mockResolvedValue(response({}));
+    service.load(item).subscribe({ error: () => undefined });
+    await settle();
+    service.load(item, true).subscribe({ error: () => undefined });
+    await settle();
+    expect(fetch.mock.calls[1][1].body).toBe(fetch.mock.calls[0][1].body);
+    service.load(item).subscribe({ error: () => undefined });
+    await settle();
+    expect(fetch.mock.calls[2][1].body).not.toBe(fetch.mock.calls[0][1].body);
   });
 
-  it('accepts an empty API list and surfaces an API failure instead of silently using fixtures', () => {
-    const { service, http } = setup({ catalogApiBaseUrl: '/api/content', contentOrigins: [] });
-    service.list('read').subscribe(items => expect(items).toEqual([]));
-    http.expectOne('/api/content/read').flush([]);
-    let failed = false;
-    service.list('projects').subscribe({ error: () => { failed = true; } });
-    http.expectOne('/api/content/projects').flush('unavailable', { status: 503, statusText: 'Unavailable' });
-    expect(failed).toBe(true);
-  });
-
-  it('fetches HTML as text and adds the isolation policy and asset base before fetched markup', () => {
-    const { service, http } = setup();
-    service.load(item).subscribe(value => {
-      const text = TestBed.inject(DomSanitizer).sanitize(SecurityContext.HTML, value)!;
-      expect(text).toContain("script-src 'none'");
-      expect(text).toContain(`media-src ${new URL('projects/assets/visual-agent-builder/runtime-controller-demo.mp4', document.baseURI).href};`);
-      expect(text).toContain("frame-src 'none'");
-      expect(text).toContain("connect-src 'none'");
-      expect(text).toContain("form-action 'none'");
-      expect(text).toContain('<base href="');
-      expect(text).toContain('<html lang="en" data-portfolio-theme="light">');
-      expect(text).toContain('read/light.css');
-      expect(text).toContain('href="about:srcdoc#sample"');
-      expect(text.indexOf('Content-Security-Policy')).toBeLessThan(text.indexOf('<title>Sample'));
-    });
-    const request = http.expectOne(r => r.url.endsWith('/projects/sample.html'));
-    expect(request.request.responseType).toBe('text');
-    expect(request.request.withCredentials).toBe(false);
-    request.flush(html);
-  });
-
-  it.each(['', '<html><body><app-root></app-root><h1>SPA fallback</h1></body></html>', '{"not":"html"}'])('rejects empty/non-document and SPA fallback responses', body => {
-    const { service, http } = setup();
-    let failed = false;
-    service.load(item).subscribe({ error: () => { failed = true; } });
-    http.expectOne(r => r.url.endsWith('/projects/sample.html')).flush(body);
-    expect(failed).toBe(true);
-  });
-
-  it('aborts an obsolete HTML request when the subscriber switches away', () => {
-    const { service, http } = setup();
-    const subscription = service.load(item).subscribe();
-    const request = http.expectOne(r => r.url.endsWith('/projects/sample.html'));
+  it('aborts stale content without cancelling independent analytics and ignores a late response', async () => {
+    const { service, fetch } = setup();
+    let finish!: (value: Response) => void;
+    fetch.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const rendered = vi.fn();
+    const subscription = service.load(item).subscribe(rendered);
+    const api = TestBed.inject(PortfolioApi);
+    api.log(api.payload('element_clicked', { path: '/', title: 'Portfolio' }, { element_id: 'nav' }, 'Sample'));
     subscription.unsubscribe();
-    expect(request.cancelled).toBe(true);
-  });
-  it('times out a stalled document request and aborts it', () => {
-    vi.useFakeTimers();
-    try {
-      const { service, http } = setup();
-      let failed = false;
-      service.load(item).subscribe({ error: () => { failed = true; } });
-      const request = http.expectOne(r => r.url.endsWith('/projects/sample.html'));
-      vi.advanceTimersByTime(15_001);
-      expect(failed).toBe(true);
-      expect(request.cancelled).toBe(true);
-    } finally { vi.useRealTimers(); }
+    expect(fetch.mock.calls[0][1].signal.aborted).toBe(true);
+    expect(fetch.mock.calls[1][1].signal.aborted).toBe(false);
+    finish(response({ project: 'Sample', content_type: 'text/html', html }));
+    await settle();
+    expect(rendered).not.toHaveBeenCalled();
   });
 
+  it('keeps read HTML local and sends an independent page view', () => {
+    const { service, fetch, http } = setup();
+    service.load({ ...item, htmlUrl: 'read/sample.html' }).subscribe();
+    http.expectOne(r => r.url.endsWith('/read/sample.html')).flush(html);
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ event_type: 'page_view', get_project: '' });
+  });
 });
