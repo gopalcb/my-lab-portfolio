@@ -53,12 +53,21 @@ describe('Portfolio route state', () => {
     expect(links[0].getAttribute('href')).toContain('/projects/visual-agent-builder');
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toContain('Runtime Controller');
     expect(links[1].textContent).toContain('What Burning 436M Tokens Taught Me');
-    expect(links[1].getAttribute('href')).toContain('/projects/agent-workflow-token-experiment');
+    expect(links[1].getAttribute('href')).toContain('/projects/what-burning-436m-tokens-taught-me');
     expect(links[2].textContent).toContain('OpenTelemetry implementation lab');
     expect(links[2].getAttribute('href')).toContain('/projects/aws-observability');
     expect(links[3].textContent).toContain('Customizing agents and runtime');
     expect(harness.routeNativeElement!.querySelector('.site-nav')?.textContent).toContain('My lab');
     expect(harness.routeNativeElement!.querySelector('.site-nav a[href="/read"]')).toBeNull();
+  });
+
+  it('redirects the previous token article URL to its renamed route', async () => {
+    configure();
+    const harness = await RouterTestingHarness.create();
+    const page = await harness.navigateByUrl('/projects/agent-workflow-token-experiment', PortfolioPage);
+    expect(TestBed.inject(Router).url).toBe('/projects/what-burning-436m-tokens-taught-me');
+    expect(page.state().selected?.id).toBe('what-burning-436m-tokens-taught-me');
+    expect(harness.routeNativeElement!.querySelector('.item-list [aria-current]')?.textContent).toContain('What Burning 436M Tokens Taught Me');
   });
 
   it('loads the AWS observability project as completed portfolio content', async () => {

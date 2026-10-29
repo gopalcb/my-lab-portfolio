@@ -21,6 +21,7 @@ export const appConfig: ApplicationConfig = {
       { path: 'my-works', pathMatch: 'full', redirectTo: 'projects' },
       { path: 'projects', component: PortfolioPage, data: { kind: 'projects' } },
       { path: 'projects/aws-observability-redice', pathMatch: 'full', redirectTo: 'projects/aws-observability' },
+      { path: 'projects/agent-workflow-token-experiment', pathMatch: 'full', redirectTo: 'projects/what-burning-436m-tokens-taught-me' },
       { path: 'projects/:id', component: PortfolioPage, data: { kind: 'projects' } },
       { path: 'read', component: PortfolioPage, data: { kind: 'read' } },
       { path: 'read/linux-essentials', pathMatch: 'full', redirectTo: 'read/implementation-and-delivery' },
