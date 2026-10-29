@@ -1,7 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, InjectionToken, inject } from '@angular/core';
 import { CONTENT_SETTINGS } from './content.catalog';
-import { analyticsExcluded } from '../../analytics-preference';
 
 export const PORTFOLIO_ENDPOINT = new InjectionToken<string>('PORTFOLIO_ENDPOINT', {
   providedIn: 'root', factory: () => CONTENT_SETTINGS.endpoint,
@@ -22,7 +21,7 @@ export interface EventMetadata {
   viewport_width?: number;
 }
 export interface PortfolioPayload {
-  analytics_excluded?: boolean;
+  owner_guid?: string;
   action: '' | 'nav';
   target: string;
   get_project: string;
@@ -77,7 +76,6 @@ export class PortfolioApi {
 
   /** Analytics owns its request, independently of route/content subscriptions. */
   log(payload: PortfolioPayload, keepalive = false): void {
-    if (analyticsExcluded(this.document.defaultView)) return;
     void this.post(payload, undefined, keepalive).catch(() => undefined);
   }
 
@@ -88,8 +86,9 @@ export class PortfolioApi {
       throw new Error('Portfolio endpoint must be an absolute HTTPS URL.');
     }
     // Serialize once: both network retries preserve every part of the logical event.
-    const body = JSON.stringify(analyticsExcluded(this.document.defaultView)
-      ? { ...payload, analytics_excluded: true } : payload);
+    const guid = new URL(this.document.defaultView?.location.href ?? 'https://localhost/').searchParams.get('guid');
+    const body = JSON.stringify(guid && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(guid)
+      ? { ...payload, owner_guid: guid } : payload);
     for (let attempt = 0; attempt < 2; attempt++) {
       const controller = new AbortController();
       const abort = () => controller.abort();

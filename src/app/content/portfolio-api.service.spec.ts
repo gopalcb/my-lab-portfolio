@@ -15,15 +15,16 @@ describe('PortfolioApi', () => {
   beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
   afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
 
-  it('skips excluded logs but requests content without recording, and restores ordinary visits', async () => {
+  it('passes the bookmarked GUID to Lambda without using the former browser preference', async () => {
     const { api, fetch } = setup();
+    const guid = 'bda9e542-3044-4f9e-9b8e-1a6cf7dc6f88';
+    history.replaceState(null, '', '/?guid=' + guid);
+    await api.post(api.payload('page_view', context));
+    expect(JSON.parse(fetch.mock.calls[0][1].body).owner_guid).toBe(guid);
+    history.replaceState(null, '', '/');
     localStorage.setItem('portfolio-analytics-excluded', 'true');
     api.log(api.payload('page_view', context));
-    expect(fetch).not.toHaveBeenCalled();
-    await api.post(api.payload('project_open', context, {}, '', 'Sample'));
-    expect(JSON.parse(fetch.mock.calls[0][1].body).analytics_excluded).toBe(true);
-    localStorage.setItem('portfolio-analytics-excluded', 'false');
-    await api.post(api.payload('page_view', context));
+    expect(JSON.parse(fetch.mock.calls[1][1].body).owner_guid).toBeUndefined();
     expect(JSON.parse(fetch.mock.calls[1][1].body).analytics_excluded).toBeUndefined();
   });
 

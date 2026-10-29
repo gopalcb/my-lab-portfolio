@@ -1,8 +1,8 @@
 <a class="skip" href="#content-area" (click)="$event.preventDefault(); contentArea.focus()">Skip to content</a>
 <aside class="sidebar">
   <nav class="site-nav" aria-label="Main navigation">
-    <a data-track-id="projects-menu" data-track-title="My lab" routerLink="/projects" [attr.aria-current]="state().kind === 'projects' ? 'page' : null">My lab</a>
-    <a data-track-id="about-menu" data-track-title="About Me" routerLink="/about-me" [attr.aria-current]="state().kind === 'about' ? 'page' : null">About me</a>
+    <a data-track-id="projects-menu" data-track-title="My lab" queryParamsHandling="preserve" routerLink="/projects" [attr.aria-current]="state().kind === 'projects' ? 'page' : null">My lab</a>
+    <a data-track-id="about-menu" data-track-title="About Me" queryParamsHandling="preserve" routerLink="/about-me" [attr.aria-current]="state().kind === 'about' ? 'page' : null">About me</a>
   </nav>
   <section class="item-navigation" aria-label="Content list">
     @if (state().kind === 'projects' || state().kind === 'read') {
@@ -12,7 +12,7 @@
           @if (state().kind === 'read' && ($index === 0 || item.topic !== visibleItems()[$index - 1].topic)) {
             <p class="nav-label topic-label">{{ item.topic ?? 'DEV NOTES' }}</p>
           }
-          <a [attr.data-track-id]="'content-' + item.id" [attr.data-track-title]="item.title" [routerLink]="['/', state().kind, item.id]" [attr.aria-current]="state().selected?.id === item.id ? 'page' : null" [title]="item.summary">{{ item.title }}</a>
+          <a [attr.data-track-id]="'content-' + item.id" [attr.data-track-title]="item.title" queryParamsHandling="preserve" [routerLink]="['/', state().kind, item.id]" [attr.aria-current]="state().selected?.id === item.id ? 'page' : null" [title]="item.summary">{{ item.title }}</a>
         }
       </nav>
       @if (state().phase === 'loading-list') { <p class="list-status" role="status">Loading titles…</p> }
@@ -36,7 +36,7 @@
         @case ('catalog-error') { <h1>Titles couldn’t be loaded.</h1><p>Check your connection and try again.</p><button (click)="retry()">Try again</button> }
         @case ('content-error') { <h1>This page couldn’t be loaded.</h1><p>{{ state().selected?.title }} is temporarily unavailable.</p><button (click)="retry()">Try again</button> }
         @case ('empty') { <h1>Nothing published yet.</h1><p>New {{ state().kind === 'read' ? 'articles' : 'projects' }} will appear here.</p> }
-        @case ('not-found') { <h1>Page not found.</h1><p>Choose a title from the left, or <a routerLink="/projects">return to My lab</a>.</p> }
+        @case ('not-found') { <h1>Page not found.</h1><p>Choose a title from the left, or <a queryParamsHandling="preserve" routerLink="/projects">return to My lab</a>.</p> }
         @default { <h1>Gopal C Bala</h1><p>gopalcb · he/him</p> }
       }
     </section>
