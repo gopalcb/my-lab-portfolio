@@ -13,8 +13,12 @@ npm test -- --watch=false
 npm run build
 ```
 
-Preview: http://127.0.0.1:4200/. Hash routes preserve direct links and refresh on
-static hosting. `/projects` opens Runtime Controller; `/projects/:id` selects a
+Preview: http://127.0.0.1:4200/. Angular uses clean path routes. `npm run build`
+generates directory entry files for every catalog route and an Angular `404.html`
+fallback for GitHub Pages. Publish the whole browser output directory; known
+routes support direct entry and refresh, while unknown routes retain HTTP 404.
+Existing `#/…` bookmarks convert before bootstrap without adding a visit.
+`/projects` opens Runtime Controller; `/projects/:id` selects a
 project, `/read/:id` selects a Dev note, and `/about-me` loads About Me. Legacy
 `/my-works`, `/read/linux-essentials` and the old observability route redirect to
 their current routes.
@@ -56,7 +60,12 @@ local preview. CORS is not visitor authentication; the content endpoint is publi
 
 Project/About HTML is validated before rendering. Empty logging responses cannot
 become documents. Route changes cancel obsolete rendering; loading and retryable
-errors preserve the previous successful document. Network requests have a
+errors preserve the previous successful document. Incoming frames stay hidden
+and inert until the validated frame bridge reports its load event, when styles and eager assets have
+settled. The previous article remains visible until that point; then a short
+reveal runs unless reduced motion is requested. Lazy images and streaming video
+are not downloaded in full before reveal. A 20-second frame-load deadline exposes
+retry without replacing the previous article. Network requests have a
 15-second timeout and one automatic retry for transient failures. A retry button
 reuses the original content payload.
 

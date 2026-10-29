@@ -6,6 +6,13 @@ const valid = { channel: 'portfolio-tracking-v1', documentId: 'current', type: '
 const message = (data: unknown = valid, origin = 'null', eventSource: Window | null = source) => ({ data, origin, source: eventSource }) as MessageEvent;
 
 describe('opaque iframe bridge', () => {
+  it('validates document readiness with the same source and identity boundary', () => {
+    const ready = { channel: valid.channel, documentId: 'current', type: 'document_ready' };
+    expect(validateBridgeMessage(message(ready), source, 'current')?.type).toBe('document_ready');
+    expect(validateBridgeMessage(message(ready), source, 'obsolete')).toBeNull();
+    expect(validateBridgeMessage(message(ready, 'null', {} as Window), source, 'current')).toBeNull();
+    expect(validateBridgeMessage(message(ready, 'https://evil.test'), source, 'current')).toBeNull();
+  });
   it('accepts only the current frame, null origin, channel, document and typed metadata', () => {
     expect(validateBridgeMessage(message(), source, 'current')).toEqual(valid);
     expect(validateBridgeMessage(message(valid, 'https://evil.test'), source, 'current')).toBeNull();

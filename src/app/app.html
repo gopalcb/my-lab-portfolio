@@ -24,18 +24,15 @@
     <nav class="sidebar-social" aria-label="Social profiles"><a href="https://github.com/gopalcb" target="_blank" rel="noopener noreferrer">My GitHub</a><a href="https://www.linkedin.com/in/gopal-c-bala" target="_blank" rel="noopener noreferrer">My LinkedIn</a></nav>
   </div>
 </aside>
-<main #contentArea id="content-area" tabindex="-1" [attr.aria-busy]="state().phase === 'loading-content' || state().phase === 'loading-list'">
-  @if (state().document && (state().phase === 'loading-list' || state().phase === 'loading-content')) { <p role="status">Loading {{ state().selected?.title ?? 'content' }}…</p> }
-  @if (state().document && (state().phase === 'content-error' || state().phase === 'catalog-error')) { <p role="alert">This page couldn’t be loaded. <button (click)="retry()">Try again</button></p> }
-  @if (state().document) {
-    @for (view of frameViews(); track view.id) {
-    <iframe #contentFrame class="content-frame" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" [srcdoc]="view.html" [title]="view.title ?? 'Portfolio content'"></iframe>
-    }
-  } @else {
+<main #contentArea id="content-area" tabindex="-1" [attr.aria-busy]="loading()">
+  @if (loading()) { <p class="load-status" role="status">Loading {{ state().selected?.title ?? 'content' }}…</p> }
+  @if (renderFailed() || (displayed() && (state().phase === 'content-error' || state().phase === 'catalog-error'))) { <p class="load-status" role="alert">This page couldn’t be loaded. <button (click)="retry()">Try again</button></p> }
+  @for (view of frameViews(); track view.id) {
+    <iframe #contentFrame class="content-frame" [class.frame-pending]="view.pending" [class.page-enter]="!view.pending" [attr.inert]="view.pending ? '' : null" [attr.aria-hidden]="view.pending ? 'true' : null" [attr.data-document-id]="view.id" sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" [srcdoc]="view.html" [title]="view.title"></iframe>
+  }
+  @if (!displayed() && !loading() && !renderFailed()) {
     <section class="message" [class.page-enter]="state().phase === 'ready'" aria-live="polite">
       @switch (state().phase) {
-        @case ('loading-list') { <p role="status">Loading titles…</p> }
-        @case ('loading-content') { <p role="status">Loading {{ state().selected?.title }}…</p> }
         @case ('catalog-error') { <h1>Titles couldn’t be loaded.</h1><p>Check your connection and try again.</p><button (click)="retry()">Try again</button> }
         @case ('content-error') { <h1>This page couldn’t be loaded.</h1><p>{{ state().selected?.title }} is temporarily unavailable.</p><button (click)="retry()">Try again</button> }
         @case ('empty') { <h1>Nothing published yet.</h1><p>New {{ state().kind === 'read' ? 'articles' : 'projects' }} will appear here.</p> }

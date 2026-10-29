@@ -2,7 +2,7 @@
 
 ```mermaid
 flowchart LR
-    R[Angular hash route] --> P[PortfolioPage]
+    R[Angular path route] --> P[PortfolioPage]
     P --> C[Typed local catalog]
     P --> S[ContentService]
     S -->|Project or About title| A[PortfolioApi: JSON POST]
@@ -22,7 +22,13 @@ logging. No browser code has AWS credentials or the origin header secret.
 
 `PortfolioPage` resolves routes, updates the page title, discards obsolete
 responses, preserves the last successful view during loading/failure, and offers
-retry. A capture-phase host listener records clicks before Angular navigation;
+retry. Route reuse keeps the viewer alive across section changes; navigation-end
+snapshots prevent mixed route data from triggering duplicate content requests.
+It stages an inert incoming frame until the validated bridge reports its load event, ignores stale
+loads, and preserves the displayed frame through a bounded asset-load timeout.
+Tracking accepts events only from the displayed frame. Reveals respect reduced
+motion. Frame readiness does not add a second page-view event.
+A capture-phase host listener records clicks before Angular navigation;
 it is removed on destruction. Native keyboard link activation is the same click,
 not a second event. Direct routes/back/refresh request content without fabricated
 clicks. Root redirects to the first project, whose content request is its view event.
@@ -61,3 +67,9 @@ validation, iframe message isolation and event handling. Supplemental headless
 checks and native Computer Use evidence are recorded separately from unit tests.
 The existing GitHub Pages workflow publishes a selected source revision after
 frontend tests/build; infrastructure deployment remains outside this repository.
+
+The production build emits an app entry index for every catalog route and legacy
+alias, plus a 404 app shell. Known deep links work on static hosting without
+hash routing; unknown paths keep HTTP 404 and show Angular's not-found view.
+Legacy hash bookmarks are converted with same-origin history replacement before
+bootstrap, preserving their query/anchor without creating a second page visit.

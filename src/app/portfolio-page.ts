@@ -1,8 +1,8 @@
-import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, QueryList, ViewChildren, computed, effect, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { Title, SafeHtml } from '@angular/platform-browser';
-import { Subject, catchError, combineLatest, distinctUntilChanged, map, of, scan, startWith, switchMap, tap } from 'rxjs';
+import { Subject, catchError, combineLatest, distinctUntilChanged, filter, map, of, scan, startWith, switchMap, tap } from 'rxjs';
 import { ContentItem, ContentKind } from './content/content.models';
 import { ABOUT_ITEM, ContentService } from './content/content.service';
 import { HIDDEN_PROJECT_IDS } from './content/content.catalog';
@@ -33,12 +33,15 @@ export class PortfolioPage {
   private readonly title = inject(Title);
   private readonly retries = new Subject<number>();
   private retryCount = 0;
-  @ViewChild('contentFrame') private frame?: ElementRef<HTMLIFrameElement>;
+  @ViewChildren('contentFrame') private frames?: QueryList<ElementRef<HTMLIFrameElement>>;
+  readonly displayed = signal(this.service.displayed);
+  readonly renderFailed = signal<string | undefined>(undefined);
 
   readonly state = toSignal(combineLatest([
-    this.route.paramMap, this.route.data, this.retries.pipe(startWith(0)),
+    this.router.events.pipe(filter(event => event instanceof NavigationEnd), startWith(null),
+      map(() => this.route.snapshot)), this.retries.pipe(startWith(0)),
   ]).pipe(
-    map(([params, data, retry]) => ({ kind: data['kind'] as PageKind, id: params.get('id'), retry })),
+    map(([route, retry]) => ({ kind: route.data['kind'] as PageKind, id: route.paramMap.get('id'), retry })),
     distinctUntilChanged((a, b) => a.kind === b.kind && a.id === b.id && a.retry === b.retry),
     scan((previous, current) => ({ ...current, isRetry: previous.kind === current.kind && previous.id === current.id && previous.retry !== current.retry }),
       { kind: '' as PageKind, id: null as string | null, retry: 0, isRetry: false }),
@@ -79,18 +82,33 @@ export class PortfolioPage {
       ? { ...current, document: previous.document, documentId: previous.documentId, documentPath: previous.documentPath, documentTitle: previous.documentTitle }
       : current, { ...INITIAL, ...this.service.displayed }),
     tap(state => {
-      if (state.phase === 'ready' && state.document && state.documentId) this.service.displayed = {
-        document: state.document, documentId: state.documentId, documentTitle: state.documentTitle!, documentPath: state.documentPath!,
-      };
-      else if (['not-found', 'empty'].includes(state.phase)) this.service.displayed = undefined;
+      if (['not-found', 'empty'].includes(state.phase)) {
+        this.service.displayed = undefined;
+        this.displayed.set(undefined);
+      }
     }),
   ), { initialValue: { ...INITIAL, ...this.service.displayed } });
 
-  // A successful document owns a fresh browsing context; loading/retry retains the old one.
+  // Keep the visible browsing context until the incoming document's resources settle.
   readonly frameViews = computed(() => {
     const state = this.state();
-    return state.document ? [{ id: state.documentId, html: state.document, title: state.documentTitle }] : [];
+    const visible = this.displayed();
+    const views = visible ? [{ id: visible.documentId, html: visible.document, title: visible.documentTitle, pending: false }] : [];
+    if (state.phase === 'ready' && state.document && state.documentId !== visible?.documentId && state.documentId !== this.renderFailed()) {
+      views.push({ id: state.documentId!, html: state.document, title: state.documentTitle!, pending: true });
+    }
+    return views;
   });
+  readonly loading = computed(() => ['loading-list', 'loading-content'].includes(this.state().phase)
+    || (this.state().phase === 'ready' && this.state().documentId !== this.displayed()?.documentId && !this.renderFailed()));
+
+  frameLoaded(id: string): void {
+    const state = this.state();
+    if (state.phase !== 'ready' || state.documentId !== id || this.renderFailed() === id || !state.document) return;
+    const visible = { document: state.document, documentId: id, documentTitle: state.documentTitle!, documentPath: state.documentPath! };
+    this.service.displayed = visible;
+    this.displayed.set(visible);
+  }
 
   readonly visibleItems = computed(() => this.state().kind === 'projects'
     ? this.state().items.filter(item => !HIDDEN_PROJECT_IDS.has(item.id)) : this.state().items);
@@ -98,6 +116,14 @@ export class PortfolioPage {
   retry(): void { this.retries.next(++this.retryCount); }
 
   constructor() {
+    effect(onCleanup => {
+      const state = this.state();
+      const visible = this.displayed();
+      this.renderFailed.set(undefined);
+      if (state.phase !== 'ready' || state.documentId === visible?.documentId) return;
+      const timeout = setTimeout(() => this.renderFailed.set(state.documentId), 20_000);
+      onCleanup(() => clearTimeout(timeout));
+    });
     // RouterLink can destroy this component before the click reaches a bubbling listener.
     const captureClick = (event: MouseEvent) => this.trackClick(event);
     this.host.nativeElement.addEventListener('click', captureClick, true);
@@ -115,10 +141,14 @@ export class PortfolioPage {
 
   @HostListener('window:message', ['$event'])
   trackFrame(event: MessageEvent): void {
-    const state = this.state();
-    const message = validateBridgeMessage(event, this.frame?.nativeElement.contentWindow ?? null, state.documentId ?? '');
+    const state = this.displayed();
+    const frame = this.frames?.find(ref => ref.nativeElement.contentWindow === event.source);
+    const id = frame?.nativeElement.dataset['documentId'] ?? '';
+    const message = validateBridgeMessage(event, frame?.nativeElement.contentWindow ?? null, id);
     if (!message) return;
-    const context = { path: state.documentPath ?? this.router.url, title: state.documentTitle ?? '' };
+    if (message.type === 'document_ready') { this.frameLoaded(id); return; }
+    if (id !== state?.documentId) return;
+    const context = { path: state?.documentPath ?? this.router.url, title: state?.documentTitle ?? '' };
     if (message.type === 'element_clicked') {
       this.api.log(this.api.payload('element_clicked', context, { element_id: message.elementId }, message.title), message.external);
     } else {

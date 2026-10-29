@@ -3,6 +3,8 @@ export function trackingBridge(documentId: string): string {
   return `(() => {
     const documentId = ${JSON.stringify(documentId)};
     const send = payload => parent.postMessage({ channel: 'portfolio-tracking-v1', documentId, ...payload }, '*');
+    // Signal from the actual srcdoc, not the iframe's initial about:blank load.
+    window.addEventListener('load', () => send({ type: 'document_ready' }), { once: true });
     const title = el => {
       const labelled = (el.getAttribute('aria-labelledby') || '').split(/\\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ').trim();
       const labels = [...(el.labels || [])].map(label => label.textContent || '').join(' ').trim();
@@ -56,7 +58,7 @@ export function trackingBridge(documentId: string): string {
 }
 
 export interface BridgeEvent {
-  type: 'element_clicked' | 'video_play' | 'video_pause' | 'video_ended';
+  type: 'document_ready' | 'element_clicked' | 'video_play' | 'video_pause' | 'video_ended';
   title: string;
   elementId?: string;
   external?: boolean;
@@ -68,6 +70,7 @@ export function validateBridgeMessage(event: MessageEvent, frameWindow: Window |
   if (!frameWindow || event.source !== frameWindow || event.origin !== 'null') return null;
   const value = event.data;
   if (!value || typeof value !== 'object' || value.channel !== 'portfolio-tracking-v1' || value.documentId !== documentId) return null;
+  if (value.type === 'document_ready') return { type: 'document_ready', title: '' };
   const bounded = (text: unknown, limit: number): text is string => typeof text === 'string' && text.trim().length > 0 && text.length <= limit;
   if (!bounded(value.title, 200)) return null;
   if (value.type === 'element_clicked') {
