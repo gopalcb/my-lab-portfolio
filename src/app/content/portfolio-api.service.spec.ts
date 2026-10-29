@@ -12,8 +12,20 @@ function setup(endpoint = 'https://api.example.test/gb-portfolio/get-content') {
 const context = { path: '/projects/sample?private=value#anchor', title: 'Sample' };
 
 describe('PortfolioApi', () => {
-  beforeEach(() => sessionStorage.clear());
-  afterEach(() => vi.restoreAllMocks());
+  beforeEach(() => { sessionStorage.clear(); localStorage.clear(); });
+  afterEach(() => { vi.restoreAllMocks(); localStorage.clear(); });
+
+  it('skips excluded logs but requests content without recording, and restores ordinary visits', async () => {
+    const { api, fetch } = setup();
+    localStorage.setItem('portfolio-analytics-excluded', 'true');
+    api.log(api.payload('page_view', context));
+    expect(fetch).not.toHaveBeenCalled();
+    await api.post(api.payload('project_open', context, {}, '', 'Sample'));
+    expect(JSON.parse(fetch.mock.calls[0][1].body).analytics_excluded).toBe(true);
+    localStorage.setItem('portfolio-analytics-excluded', 'false');
+    await api.post(api.payload('page_view', context));
+    expect(JSON.parse(fetch.mock.calls[1][1].body).analytics_excluded).toBeUndefined();
+  });
 
   it('shares tab storage, refreshes activity, and rotates after thirty minutes idle', () => {
     const { api } = setup();
