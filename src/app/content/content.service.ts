@@ -73,7 +73,7 @@ export class ContentService {
     const styles = new URL('read/light.css', this.document.baseURI).href;
     // SECURITY: only this generated script has the nonce. The iframe must never gain allow-same-origin.
     // The local route URL, rather than the API URL, remains the base for every asset.
-    const isolated = `<!doctype html><html lang="en" data-portfolio-theme="light"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escape(policy)}"><base href="${escape(url.href)}"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${escape(styles)}">${parsed.head.innerHTML}</head><body>${parsed.body.innerHTML}<script nonce="${nonce}">${trackingBridge(documentId)}</script></body></html>`;
+    const isolated = `<!doctype html><html lang="en" data-portfolio-theme="light"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${escape(policy)}"><base href="${escape(url.href)}"><meta name="viewport" content="width=device-width, initial-scale=1"><link rel="stylesheet" href="${escape(styles)}">${parsed.head.innerHTML}</head><body class="${escape(parsed.body.className)}">${parsed.body.innerHTML}<script nonce="${nonce}">${trackingBridge(documentId)}</script></body></html>`;
     return this.sanitizer.bypassSecurityTrustHtml(isolated);
   }
 }

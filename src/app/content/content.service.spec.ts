@@ -61,6 +61,21 @@ describe('ContentService', () => {
     expect(text).toContain('current-document');
   });
 
+  it('preserves article body classes without allowing attribute injection', async () => {
+    const { service, fetch } = setup();
+    const source = html.replace('<body>', '<body class="observability article &quot; onload=&quot;alert(1)" onload="alert(2)">');
+    fetch.mockResolvedValue(response({ project: 'Sample', content_type: 'text/html', html: source }));
+    let text = '';
+    service.load(item).subscribe(value => { text = TestBed.inject(DomSanitizer).sanitize(SecurityContext.HTML, value)!; });
+    await settle();
+    const doc = new DOMParser().parseFromString(text, 'text/html');
+    expect(doc.body.classList.contains('observability')).toBe(true);
+    expect(doc.body.classList.contains('article')).toBe(true);
+    expect(doc.body.hasAttribute('onload')).toBe(false);
+    expect(doc.body.attributes).toHaveLength(1);
+    expect(doc.querySelectorAll('script')).toHaveLength(1);
+  });
+
   it.each([{}, { html: '' }, { html: '<h1>fragment</h1>' }, { html: '<html><body><app-root></app-root><h1>Fallback</h1></body></html>' }, { project: 'Wrong', html }])('rejects invalid API content without replacing the current document: %j', async value => {
     const { service, fetch } = setup();
     fetch.mockResolvedValue(response({ project: 'Sample', content_type: 'text/html', ...value }));
