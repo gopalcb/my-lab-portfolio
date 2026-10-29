@@ -24,6 +24,17 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 describe('ContentService', () => {
   afterEach(() => TestBed.inject(HttpTestingController).verify());
 
+  it('loads a renamed article through its stable API title', async () => {
+    const { service, fetch } = setup();
+    const next = vi.fn();
+    const error = vi.fn();
+    service.load({ ...item, title: 'New visible title', apiTitle: 'Sample' }).subscribe({ next, error });
+    await settle();
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject({ get_project: 'Sample', page_title: 'New visible title' });
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(error).not.toHaveBeenCalled();
+  });
+
   it('uses local catalogs and never fetches project or About HTML directly', async () => {
     const { service, fetch } = setup();
     service.list('projects').subscribe(items => expect(items).toHaveLength(7));

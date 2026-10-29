@@ -52,7 +52,7 @@ describe('Portfolio route state', () => {
     expect(links[0].textContent).toContain('Runtime Controller');
     expect(links[0].getAttribute('href')).toContain('/projects/visual-agent-builder');
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toContain('Runtime Controller');
-    expect(links[1].textContent).toContain('Do More Agents Mean Better Work?');
+    expect(links[1].textContent).toContain('What Burning 436M Tokens Taught Me');
     expect(links[1].getAttribute('href')).toContain('/projects/agent-workflow-token-experiment');
     expect(links[2].textContent).toContain('OpenTelemetry implementation lab');
     expect(links[2].getAttribute('href')).toContain('/projects/aws-observability');

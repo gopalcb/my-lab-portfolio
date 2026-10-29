@@ -24,9 +24,10 @@ export class ContentService {
   load(item: ContentItem, retry = false, documentId: string = crypto.randomUUID(), path = '/'): Observable<SafeHtml> {
     const url = new URL(item.htmlUrl, this.document.baseURI);
     const isLocalRead = url.pathname.includes('/read/');
+    const apiTitle = item.apiTitle ?? item.title;
     const payload = retry && this.lastRequest?.id === item.id ? this.lastRequest.payload : this.api.payload(
       isLocalRead || item.id === 'about-me' ? 'page_view' : 'project_open',
-      { path, title: item.title }, {}, '', isLocalRead ? '' : item.title,
+      { path, title: item.title }, {}, '', isLocalRead ? '' : apiTitle,
     );
     this.lastRequest = { id: item.id, payload };
     if (isLocalRead) {
@@ -38,7 +39,7 @@ export class ContentService {
       void this.api.post(payload, controller.signal).then(value => {
         if (subscriber.closed) return;
         const response = value as { html?: unknown; project?: unknown; content_type?: unknown } | null;
-        if (!response || typeof response.html !== 'string' || response.project !== item.title || typeof response.content_type !== 'string' || !/^text\/html(?:;\s*charset=utf-8)?$/i.test(response.content_type)) {
+        if (!response || typeof response.html !== 'string' || response.project !== apiTitle || typeof response.content_type !== 'string' || !/^text\/html(?:;\s*charset=utf-8)?$/i.test(response.content_type)) {
           throw new Error('The API did not return the requested HTML document.');
         }
         subscriber.next(this.isolateDocument(response.html, url, documentId));

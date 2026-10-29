@@ -4,6 +4,8 @@ export type ContentKind = 'projects' | 'read';
 export interface ContentItem {
   id: string;
   title: string;
+  /** Stable API lookup title when the visible editorial title changes. */
+  apiTitle?: string;
   summary: string;
   htmlUrl: string;
   /** Optional editorial group for the sidebar; older API catalogs may omit it. */
