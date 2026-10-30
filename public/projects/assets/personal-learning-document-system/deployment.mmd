@@ -1,0 +1,14 @@
+flowchart TB
+  SOURCE["1 · Workload source + requirements + Dockerfile"] --> BUILD
+  BUILD@{ img: "logos/docker.svg", label: "2 · Docker build · non-root image", pos: "b", h: 48, constraint: "on" }
+  BUILD --> CHECK["3 · CI tests + image import / user checks"]
+  CHECK --> ECR
+  ECR@{ img: "aws/Amazon-Elastic-Container-Registry.svg", label: "4 · ECR · tested image per workload", pos: "b", h: 48, constraint: "on" }
+  ECR -->|"exact image digest"| ECS
+  ECS@{ img: "aws/Amazon-Elastic-Container-Service.svg", label: "5 · ECS Express · pull image and start task", pos: "b", h: 48, constraint: "on" }
+  ECS --> RUN["6 · Docker container<br/>Agent: LangChain MCP adapter<br/>Service: FastAPI / FastMCP"]
+  EDGE@{ img: "aws/Amazon-CloudFront.svg", label: "CloudFront · public HTTPS", pos: "b", h: 48, constraint: "on" }
+  EDGE -. "requests through ECS origin" .-> RUN
+  RUN --> CHECKEND["7 · Check release completion and public boundary<br/>Verify authenticated saving separately"]
+  classDef plain fill:#fbfaf7,stroke:#a9c3b5,color:#26322f;
+  class SOURCE,CHECK,RUN,CHECKEND plain;

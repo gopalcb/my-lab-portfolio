@@ -1,0 +1,25 @@
+flowchart TB
+  HOST["1 · AI host calls tools/call<br/>Authorization: Bearer token<br/>save_markdown + payload"] --> EDGE
+  EDGE@{ img: "aws/Amazon-CloudFront.svg", label: "2 · CloudFront · no caching", pos: "b", h: 44, constraint: "on" }
+  EDGE --> ECS
+  ECS@{ img: "aws/Amazon-Elastic-Container-Service.svg", label: "3 · ECS Express routing · running task", pos: "b", h: 44, constraint: "on" }
+  ECS --> IN["4 · Uvicorn / FastAPI ingress<br/>Verify adapter token, session, subject and scope"]
+  IN -. "session lookup" .-> OAUTH["OAuth adapter in the same service<br/>Issues host tokens after Cognito login"]
+  OAUTH -. "private OTP + upstream token checks" .-> COG
+  COG@{ img: "aws/Amazon-Cognito.svg", label: "Cognito", pos: "b", h: 44, constraint: "on" }
+  OAUTH -. "encrypted session state" .-> STATE
+  STATE@{ img: "aws/Amazon-DynamoDB.svg", label: "DynamoDB · OAuth state", pos: "b", h: 44, constraint: "on" }
+  IN -->|"unauthorized"| DENY["401 / 403 · no document write"]
+  IN -->|"authorized; bounded body"| MCP["5 · FastMCP handles /mcp/<br/>Dispatch save_markdown; validate UploadBatch"]
+  MCP --> SAVE["6 · save_batch → store_documents<br/>Use workload IAM credentials"]
+  SAVE --> PENDING["7 · Create PENDING index record"]
+  PENDING --> S3
+  S3@{ img: "aws/Amazon-Simple-Storage-Service.svg", label: "8 · S3 PutObject · return VersionId", pos: "b", h: 44, constraint: "on" }
+  S3 --> READY["9 · Mark index READY<br/>Pin the exact S3 version"]
+  PENDING -. "write" .-> INDEX
+  READY -. "update" .-> INDEX
+  INDEX@{ img: "aws/Amazon-DynamoDB.svg", label: "DynamoDB · document index", pos: "b", h: 44, constraint: "on" }
+  READY --> RESULT["10 · Return per-file result through MCP<br/>success, name, file_id, status and s3_key"]
+  classDef plain fill:#fbfaf7,stroke:#a9c3b5,color:#26322f;
+  class HOST,IN,OAUTH,MCP,SAVE,PENDING,READY,RESULT plain;
+  style DENY fill:#fff3eb,stroke:#b48159,color:#6b4024;

@@ -1,0 +1,19 @@
+flowchart TB
+    C["1 · Codex + saving skill"]
+    H["1 · ChatGPT + plugin / skill"]
+    A["1 · LangChain MCP adapter · agent on ECS"]
+  C & H & A -->|"HTTPS · MCP tool call"| EDGE
+  EDGE@{ img: "aws/Amazon-CloudFront.svg", label: "3 · CloudFront", pos: "b", h: 44, constraint: "on" }
+  EDGE --> ECS
+  ECS@{ img: "aws/Amazon-Elastic-Container-Service.svg", label: "4 · ECS · Docker · FastMCP document service", pos: "b", h: 44, constraint: "on" }
+  ECS -. "OAuth adapter · private sign-in" .-> AUTH
+  AUTH@{ img: "aws/Amazon-Cognito.svg", label: "2 · Cognito · email OTP", pos: "b", h: 44, constraint: "on" }
+  ECS --> STORE["5 · Shared document storage code<br/>Validated writes using the ECS task role"]
+  STORE --> S3
+  STORE --> IDX
+  S3@{ img: "aws/Amazon-Simple-Storage-Service.svg", label: "Amazon S3 · Markdown versions", pos: "b", h: 44, constraint: "on" }
+  IDX@{ img: "aws/Amazon-DynamoDB.svg", label: "Amazon DynamoDB · document index", pos: "b", h: 44, constraint: "on" }
+  VIEW["6 · Document viewer + document API"] -. "read saved content" .-> S3
+  VIEW -. "list READY records" .-> IDX
+  classDef plain fill:#fbfaf7,stroke:#a9c3b5,color:#26322f;
+  class C,H,A,STORE,VIEW plain;

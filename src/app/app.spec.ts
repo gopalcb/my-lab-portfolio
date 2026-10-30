@@ -21,6 +21,14 @@ function configure(overrides: Partial<typeof service> = {}) {
 }
 
 describe('Portfolio route state', () => {
+  it('opens the agent file sharing project from its direct route', async () => {
+    configure();
+    const harness = await RouterTestingHarness.create();
+    const page = await harness.navigateByUrl('/projects/agent-file-sharing-network-langchain-mcp-oauth-and-aws', PortfolioPage);
+    expect(page.state().selected?.title).toBe('agent file sharing network: langchain mcp, oauth and aws');
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('agent file sharing network: langchain mcp, oauth and aws');
+  });
+
   it('opens About through content delivery and profile links in separate tabs', async () => {
     configure();
     const harness = await RouterTestingHarness.create();
@@ -48,7 +56,7 @@ describe('Portfolio route state', () => {
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects', PortfolioPage);
     const links = [...harness.routeNativeElement!.querySelectorAll('.item-list a')];
-    expect(links).toHaveLength(4);
+    expect(links).toHaveLength(5);
     expect(links[0].textContent).toContain('Runtime Controller');
     expect(links[0].getAttribute('href')).toContain('/projects/runtime-controller');
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toContain('Runtime Controller');
@@ -57,6 +65,8 @@ describe('Portfolio route state', () => {
     expect(links[2].textContent).toContain('OpenTelemetry implementation lab');
     expect(links[2].getAttribute('href')).toContain('/projects/aws-observability');
     expect(links[3].textContent).toContain('Customizing agents and runtime');
+    expect(links[4].textContent).toContain('agent file sharing network: langchain mcp, oauth and aws');
+    expect(links[4].getAttribute('href')).toContain('/projects/agent-file-sharing-network-langchain-mcp-oauth-and-aws');
     expect(harness.routeNativeElement!.querySelector('.site-nav')?.textContent).toContain('My lab');
     expect(harness.routeNativeElement!.querySelector('.site-nav a[href="/read"]')).toBeNull();
   });
@@ -91,7 +101,7 @@ describe('Portfolio route state', () => {
     configure();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects/my-customized-agents-and-runtime', PortfolioPage);
-    expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(4);
+    expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(5);
     expect(harness.routeNativeElement!.querySelector('.item-list [aria-current]')?.textContent).toContain('Customizing agents and runtime');
     const reading = await harness.navigateByUrl('/read/kubernetes-networking', PortfolioPage);
     reading.frameLoaded(reading.state().documentId!);
