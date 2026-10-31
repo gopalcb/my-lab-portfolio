@@ -28,7 +28,10 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .item-list { display: flex; flex-direction: column; gap: 24px; }
 .item-list a, .sidebar-social a { font: 11px/1.9 ui-monospace, monospace; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; }
 .item-list a[aria-current], .sidebar-social a { color: var(--accent); font-weight: 700; }
-.site-nav a:hover, .item-list a:hover { color: var(--accent); }
+.item-list:not(.reading-list) a { padding: 8px 12px; border: 1px solid transparent; border-radius: 4px; }
+.item-list:not(.reading-list) a:hover { border-color: var(--accent); }
+.item-list:not(.reading-list) a[aria-current] { border-color: var(--accent); background: var(--panel-bg); }
+.site-nav a:hover, .reading-list a:hover { color: var(--accent); }
 .list-status { font-size: 12px; color: var(--muted); }
 .sidebar-footer { align-self: end; }
 .sidebar-social { display: flex; flex-wrap: wrap; gap: 12px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 12px; color: var(--subtle); }
