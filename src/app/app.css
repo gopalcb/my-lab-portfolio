@@ -25,6 +25,7 @@ a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outlin
 .site-nav a[aria-current] { border-bottom-color: var(--accent); color: var(--accent); }
 .item-navigation { min-height: 0; align-self: center; }
 .nav-label { font: 9px ui-monospace, monospace; color: var(--subtle); letter-spacing: .13em; margin: 0 0 18px; }
+.item-navigation > .nav-label { font-weight: 700; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .item-list { display: flex; flex-direction: column; gap: 24px; }
 .item-list a, .sidebar-social a { font: 11px/1.9 ui-monospace, monospace; letter-spacing: .09em; text-transform: uppercase; color: var(--muted); overflow-wrap: anywhere; }
 .item-list a[aria-current], .sidebar-social a { color: var(--accent); font-weight: 700; }
