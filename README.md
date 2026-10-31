@@ -18,7 +18,7 @@ generates directory entry files for every catalog route and an Angular `404.html
 fallback for GitHub Pages. Publish the whole browser output directory; known
 routes support direct entry and refresh, while unknown routes retain HTTP 404.
 Existing `#/…` bookmarks convert before bootstrap without adding a visit.
-`/projects` opens Runtime Controller; `/projects/:id` selects a
+`/projects` opens Deep Agents harness with LangGraph and Codex; `/projects/:id` selects a
 project, `/read/:id` selects a Dev note, and `/about-me` loads About Me. Legacy
 `/my-works`, `/read/linux-essentials` and the old observability route redirect to
 their current routes.
@@ -102,13 +102,15 @@ Runtime Controller is at `/#/projects/visual-agent-builder`. Its demo is
 architecture diagram has adjacent `.mmd` and SVG files. Preserve source-grounded
 claims and label illustrative or proposed behavior in technical articles.
 
-The Projects menu shows Runtime Controller, What Burning 436M Tokens Taught Me,
-OpenTelemetry implementation lab, Customizing agents and runtime, the agent file
-sharing network, and Deep Agents harness with LangGraph and Codex. The harness
-article is at `/projects/deep-agent-harness-with-codex`; its Mermaid sources and
-SVGs are in `public/projects/assets/deep-agent-harness/`. `HIDDEN_PROJECT_IDS`
-keeps the other three projects out of navigation while preserving their direct
-routes. Dev notes retain `/read` routes although their main-menu entry is hidden.
+The Projects menu shows, in order: Deep Agents harness with LangGraph and Codex,
+OpenTelemetry implementation lab, the agent file sharing network,
+What Burning 436M Tokens Taught Me, and Customizing agents and runtime.
+The harness article is at `/projects/deep-agent-harness-with-codex`; its Mermaid
+sources and SVGs are in `public/projects/assets/deep-agent-harness/`.
+`HIDDEN_PROJECT_IDS` temporarily hides Runtime Controller and the other three
+hidden projects while preserving their documents and direct routes. Dev notes
+retain `/read` routes although their main-menu entry is hidden.
+
 
 ## Publication
 

@@ -51,24 +51,20 @@ describe('Portfolio route state', () => {
     expect(harness.routeNativeElement!.querySelector('iframe')).not.toBeNull();
   });
 
-  it('shows Projects with the token-workflow article second', async () => {
+  it('shows the requested project order and opens the harness by default', async () => {
     configure();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects', PortfolioPage);
     const links = [...harness.routeNativeElement!.querySelectorAll('.item-list a')];
-    expect(links).toHaveLength(6);
-    expect(links[0].textContent).toContain('Runtime Controller');
-    expect(links[0].getAttribute('href')).toContain('/projects/runtime-controller');
-    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toContain('Runtime Controller');
-    expect(links[1].textContent).toContain('What Burning 436M Tokens Taught Me');
-    expect(links[1].getAttribute('href')).toContain('/projects/what-burning-436m-tokens-taught-me');
-    expect(links[2].textContent).toContain('OpenTelemetry implementation lab');
-    expect(links[2].getAttribute('href')).toContain('/projects/aws-observability');
-    expect(links[3].textContent).toContain('Customizing agents and runtime');
-    expect(links[4].textContent).toContain('agent file sharing network: langchain mcp, oauth and aws');
-    expect(links[4].getAttribute('href')).toContain('/projects/agent-file-sharing-network-langchain-mcp-oauth-and-aws');
-    expect(links[5].textContent).toContain('Deep Agents harness with LangGraph and Codex');
-    expect(links[5].getAttribute('href')).toContain('/projects/deep-agent-harness-with-codex');
+    expect(links.map(link => link.textContent?.trim())).toEqual([
+      'Deep Agents harness with LangGraph and Codex',
+      'OpenTelemetry implementation lab',
+      'agent file sharing network: langchain mcp, oauth and aws',
+      'What Burning 436M Tokens Taught Me',
+      'Customizing agents and runtime',
+    ]);
+    expect(links[0].getAttribute('href')).toContain('/projects/deep-agent-harness-with-codex');
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('Deep Agents harness with LangGraph and Codex');
     expect(harness.routeNativeElement!.querySelector('.site-nav')?.textContent).toContain('Projects');
     expect(harness.routeNativeElement!.querySelector('.site-nav a[href="/read"]')).toBeNull();
   });
@@ -79,6 +75,7 @@ describe('Portfolio route state', () => {
     const page = await harness.navigateByUrl('/projects/visual-agent-builder', PortfolioPage);
     expect(TestBed.inject(Router).url).toBe('/projects/runtime-controller');
     expect(page.state().selected?.id).toBe('runtime-controller');
+    expect(harness.routeNativeElement!.querySelector('.item-list a[href="/projects/runtime-controller"]')).toBeNull();
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('Runtime Controller');
   });
 
@@ -103,7 +100,7 @@ describe('Portfolio route state', () => {
     configure();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects/my-customized-agents-and-runtime', PortfolioPage);
-    expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(6);
+    expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(5);
     expect(harness.routeNativeElement!.querySelector('.item-list [aria-current]')?.textContent).toContain('Customizing agents and runtime');
     const reading = await harness.navigateByUrl('/read/kubernetes-networking', PortfolioPage);
     reading.frameLoaded(reading.state().documentId!);
@@ -272,7 +269,7 @@ describe('Portfolio API route integration', () => {
     harness.detectChanges();
     expect(TestBed.inject(Router).url).toBe('/projects');
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'Runtime Controller', page_path: '/projects' });
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'Deep Agents harness with LangGraph and Codex', page_path: '/projects' });
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('sandbox')).not.toContain('allow-same-origin');
   });
 
