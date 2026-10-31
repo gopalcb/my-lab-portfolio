@@ -1,0 +1,14 @@
+flowchart TD
+    N["NestJS<br/>gateway"] --> P["FastAPI run<br/>API"]
+    P --> G["LangGraph<br/>coordinator"]
+    G --> D["Direct<br/>assignment<br/>or<br/>configured<br/>planner"]
+    D -->|Planned + live| H["Live Deep<br/>Agents<br/>planning<br/>harness"]
+    H --> R["Read-only<br/>artifact<br/>research<br/>subagent"]
+    H --> A["Per-run<br/>planning<br/>artifacts<br/>and skills"]
+    D --> G
+    G --> C["Python HTTP<br/>CodexClient"]
+    C --> T["NestJS<br/>internal<br/>task API"]
+    T --> X["Codex SDK or<br/>demo<br/>transport"]
+    X --> W["Registered<br/>workspace"]
+    T --> V["Registered<br/>checks and<br/>saved result"]
+    V --> G

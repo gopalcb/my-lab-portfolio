@@ -1,0 +1,9 @@
+flowchart LR
+    V["Verified<br/>outcome"] --> C["Memory<br/>candidate"]
+    C --> R["Explicit<br/>review"]
+    R --> M["Reusable<br/>project<br/>memory"]
+    A["Exact<br/>proposed<br/>action"] --> G["Persisted<br/>approval<br/>gate"]
+    G --> P["Execution<br/>policy check"]
+    I["Saved<br/>dispatch<br/>intent"] --> U["Interrupted<br/>or unknown<br/>outcome"]
+    U --> S["Query<br/>execution<br/>journal"]
+    S --> K["Reconciled<br/>status"]

@@ -1,7 +1,7 @@
 <a class="skip" href="#content-area" (click)="$event.preventDefault(); contentArea.focus()">Skip to content</a>
 <aside class="sidebar">
   <nav class="site-nav" aria-label="Main navigation">
-    <a data-track-id="projects-menu" data-track-title="My lab" queryParamsHandling="preserve" routerLink="/projects" [attr.aria-current]="state().kind === 'projects' ? 'page' : null">My lab</a>
+    <a data-track-id="projects-menu" data-track-title="Projects" queryParamsHandling="preserve" routerLink="/projects" [attr.aria-current]="state().kind === 'projects' ? 'page' : null">Projects</a>
     <a data-track-id="about-menu" data-track-title="About Me" queryParamsHandling="preserve" routerLink="/about-me" [attr.aria-current]="state().kind === 'about' ? 'page' : null">About me</a>
   </nav>
   <section class="item-navigation" aria-label="Content list">
@@ -36,7 +36,7 @@
         @case ('catalog-error') { <h1>Titles couldn’t be loaded.</h1><p>Check your connection and try again.</p><button (click)="retry()">Try again</button> }
         @case ('content-error') { <h1>This page couldn’t be loaded.</h1><p>{{ state().selected?.title }} is temporarily unavailable.</p><button (click)="retry()">Try again</button> }
         @case ('empty') { <h1>Nothing published yet.</h1><p>New {{ state().kind === 'read' ? 'articles' : 'projects' }} will appear here.</p> }
-        @case ('not-found') { <h1>Page not found.</h1><p>Choose a title from the left, or <a queryParamsHandling="preserve" routerLink="/projects">return to My lab</a>.</p> }
+        @case ('not-found') { <h1>Page not found.</h1><p>Choose a title from the left, or <a queryParamsHandling="preserve" routerLink="/projects">return to Projects</a>.</p> }
         @default { <h1>Gopal C Bala</h1><p>gopalcb · he/him</p> }
       }
     </section>

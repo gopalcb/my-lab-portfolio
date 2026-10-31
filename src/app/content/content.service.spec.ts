@@ -37,7 +37,7 @@ describe('ContentService', () => {
 
   it('uses local catalogs and never fetches project or About HTML directly', async () => {
     const { service, fetch } = setup();
-    service.list('projects').subscribe(items => expect(items).toHaveLength(8));
+    service.list('projects').subscribe(items => expect(items).toHaveLength(9));
     service.list('read').subscribe(items => expect(items).toHaveLength(9));
     service.load(item, false, 'document', '/projects/sample').subscribe();
     await settle();

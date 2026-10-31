@@ -83,7 +83,7 @@ light-only, with reduced-motion-aware route transitions and responsive diagrams.
 
 ## Editing content
 
-Seven project HTML sources and About Me are maintained outside this Git repository,
+Nine project HTML sources and About Me are maintained outside this Git repository,
 in the sibling `gb-portfolio-aws/content/` directory, and deployed to private S3.
 The AWS stack, Lambda, Python tests, staging tools, deployment outputs, secrets and
 implementation plan remain in that external project. See its `ARCHITECTURE.md`
@@ -102,10 +102,13 @@ Runtime Controller is at `/#/projects/visual-agent-builder`. Its demo is
 architecture diagram has adjacent `.mmd` and SVG files. Preserve source-grounded
 claims and label illustrative or proposed behavior in technical articles.
 
-The main menu shows Runtime Controller, Do More Agents Mean Better Work?,
-OpenTelemetry implementation lab and Customizing agents and runtime. `HIDDEN_PROJECT_IDS` temporarily hides the other
-three project titles; their direct routes remain available. Dev notes retain
-`/read` routes although their main-menu entry is currently hidden.
+The Projects menu shows Runtime Controller, What Burning 436M Tokens Taught Me,
+OpenTelemetry implementation lab, Customizing agents and runtime, the agent file
+sharing network, and Deep Agents harness with LangGraph and Codex. The harness
+article is at `/projects/deep-agent-harness-with-codex`; its Mermaid sources and
+SVGs are in `public/projects/assets/deep-agent-harness/`. `HIDDEN_PROJECT_IDS`
+keeps the other three projects out of navigation while preserving their direct
+routes. Dev notes retain `/read` routes although their main-menu entry is hidden.
 
 ## Publication
 
