@@ -51,20 +51,20 @@ describe('Portfolio route state', () => {
     expect(harness.routeNativeElement!.querySelector('iframe')).not.toBeNull();
   });
 
-  it('shows the requested project order and opens the harness by default', async () => {
+  it('shows the requested project order and opens file sharing by default', async () => {
     configure();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects', PortfolioPage);
     const links = [...harness.routeNativeElement!.querySelectorAll('.item-list a')];
     expect(links.map(link => link.textContent?.trim())).toEqual([
-      'Deep Agents harness with LangGraph and Codex',
-      'OpenTelemetry implementation lab',
       'agent file sharing network: langchain mcp, oauth and aws',
+      'Hybrid Agent Harness with LangGraph, Deep Agents, and Codex',
+      'OpenTelemetry implementation lab',
       'What Burning 436M Tokens Taught Me',
       'Customizing agents and runtime',
     ]);
-    expect(links[0].getAttribute('href')).toContain('/projects/deep-agent-harness-with-codex');
-    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('Deep Agents harness with LangGraph and Codex');
+    expect(links[0].getAttribute('href')).toContain('/projects/agent-file-sharing-network-langchain-mcp-oauth-and-aws');
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('agent file sharing network: langchain mcp, oauth and aws');
     expect(harness.routeNativeElement!.querySelector('.site-nav')?.textContent).toContain('Projects');
     expect(harness.routeNativeElement!.querySelector('.site-nav a[href="/read"]')).toBeNull();
   });
@@ -269,7 +269,7 @@ describe('Portfolio API route integration', () => {
     harness.detectChanges();
     expect(TestBed.inject(Router).url).toBe('/projects');
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'Deep Agents harness with LangGraph and Codex', page_path: '/projects' });
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'agent file sharing network: langchain mcp, oauth and aws', page_path: '/projects' });
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('sandbox')).not.toContain('allow-same-origin');
   });
 

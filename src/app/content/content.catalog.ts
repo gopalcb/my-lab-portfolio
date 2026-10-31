@@ -9,9 +9,9 @@ export const HIDDEN_PROJECT_IDS = new Set(['runtime-controller', 'glue-fuzzy-mat
 
 export const LOCAL_CATALOG: Record<ContentKind, readonly ContentItem[]> = {
   projects: [
-    { id: 'deep-agent-harness-with-codex', title: 'Deep Agents harness with LangGraph and Codex', summary: 'Scoped planning, tool calls, delegation and verified Codex execution through LangGraph.', htmlUrl: 'projects/deep-agent-harness-with-codex.html' },
-    { id: 'aws-observability', title: 'OpenTelemetry implementation lab', summary: 'A staged OpenTelemetry lab for tracing services, logs, metrics, and failure evidence.', htmlUrl: 'projects/aws-observability.html' },
     { id: 'agent-file-sharing-network-langchain-mcp-oauth-and-aws', title: 'agent file sharing network: langchain mcp, oauth and aws', summary: 'A shared Markdown document network using MCP, OAuth, Docker and AWS storage.', htmlUrl: 'projects/agent-file-sharing-network-langchain-mcp-oauth-and-aws.html' },
+    { id: 'deep-agent-harness-with-codex', title: 'Hybrid Agent Harness with LangGraph, Deep Agents, and Codex', apiTitle: 'Deep Agents harness with LangGraph and Codex', summary: 'Scoped planning, tool calls, delegation and verified Codex execution through LangGraph.', htmlUrl: 'projects/deep-agent-harness-with-codex.html' },
+    { id: 'aws-observability', title: 'OpenTelemetry implementation lab', summary: 'A staged OpenTelemetry lab for tracing services, logs, metrics, and failure evidence.', htmlUrl: 'projects/aws-observability.html' },
     { id: 'what-burning-436m-tokens-taught-me', title: 'What Burning 436M Tokens Taught Me', apiTitle: 'Do More Agents Mean Better Work?', summary: 'A measured audit of agent token usage, repeated context and the limits of workflow complexity.', htmlUrl: 'projects/agent-workflow-token-experiment.html' },
     { id: 'my-customized-agents-and-runtime', title: 'Customizing agents and runtime', summary: 'Personal workflows, tools and validation around Codex.', htmlUrl: 'projects/agents-and-runtime.html' },
     { id: 'runtime-controller', title: 'Runtime Controller', summary: 'From visual instructions to project-scoped Codex execution, saved results and run history.', htmlUrl: 'projects/visual-agent-builder.html' },
