@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="en" data-portfolio-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A standalone engineering lab coordinates Codex repository work through LangGraph, Deep Agents and a NestJS execution boundary, with durable recovery and verification evidence.">
+<title>LangGraph, scoped Deep Agents and Codex: implementation guide</title>
+<style>
+*{box-sizing:border-box}
+html{color-scheme:dark;scroll-behavior:auto}
+body{margin:0;background:#101619;color:#c8d6d1;font:13px/1.9 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:1100px;margin:auto;padding:32px clamp(20px,3vw,48px) 48px}
+h1.breadcrumb{font:400 11px/1.9 ui-monospace,SFMono-Regular,monospace;letter-spacing:.06em;color:#c8d6d1;margin:0 0 24px}
+h2,h3{color:#9de8cc;font-family:ui-monospace,SFMono-Regular,monospace;font-weight:400;letter-spacing:.09em;text-transform:uppercase;line-height:1.8}
+h2{font-size:13px;margin:34px 0 14px;padding-top:16px;border-top:1px solid #314047}
+h3{font-size:12px;margin:24px 0 10px}
+p{max-width:95ch;margin:10px 0 14px}a{color:#9de8cc;text-underline-offset:4px}a:hover{color:#c5ffe8;cursor:pointer}
+a:focus-visible,[tabindex]:focus-visible{outline:2px solid #9de8cc;outline-offset:4px}
+.lede{font-size:13px;color:#a5b4ba;margin-bottom:20px}
+.notice,.card{background:#171f23;border:1px solid #334448;border-radius:4px;padding:14px 18px;margin:20px 0}.notice strong{font:10px/1.8 ui-monospace,monospace;letter-spacing:.09em;color:#9de8cc}.notice p{font-size:12px;margin:8px 0 0;color:#a5b4ba}
+code{font:11.5px/1.8 ui-monospace,SFMono-Regular,Consolas,monospace;overflow-wrap:anywhere;background:#1b282c;color:#b7ded0;border:1px solid #314047;border-radius:3px;padding:1px 4px}
+pre{margin:0;padding:12px 16px 16px;background:#121e24;line-height:1.8}pre::before{content:attr(data-language);display:block;font:9px/1.8 ui-monospace,monospace;letter-spacing:.12em;color:#879aa2;margin-bottom:8px}pre code{display:block;white-space:pre;overflow-wrap:normal;background:none;border:0;padding:0;color:#d3dfe5;font-size:11.5px}
+.token.comment{color:#869d99}.token.key{color:#83c7ed}.token.string{color:#b8dda0}.token.number{color:#e9bb87}.token.keyword{color:#c0a7ec}
+.scroll{width:100%;max-width:100%;overflow-x:auto;border:1px solid #334448;border-radius:4px;margin:14px 0}.scroll:focus-visible{outline:2px solid #9de8cc}figure{margin:22px 0}figure .scroll{background:#101619;padding:10px}figcaption{font-size:11px;line-height:1.8;color:#a5b4ba;max-width:100ch}
+table{border-collapse:collapse;width:100%;min-width:620px;font-size:12px;line-height:1.8}th,td{text-align:left;vertical-align:top;padding:10px 12px;border:1px solid #334448}th{background:#171f23;color:#9de8cc;font-weight:500}
+ul,ol{padding-left:21px}li{margin:5px 0}footer{border-top:1px solid #334448;padding-top:18px;margin-top:28px;color:#a5b4ba;font-size:11px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:18px}.sources li{margin:7px 0}section{scroll-margin-top:18px}
+@media(max-width:650px){main{padding:24px 18px 36px}.columns{grid-template-columns:1fr}h1.breadcrumb{font-size:10px}h2{font-size:12px}th,td{padding:8px 10px}}
+
+/* Script-free diagrams: neutral resource cards and one mint accent. */
+.system-diagram{padding:18px;background:#121b1f;border:1px solid #314047;border-radius:4px;overflow-wrap:anywhere}
+.diagram-title{font:11px/1.8 ui-monospace,monospace;letter-spacing:.06em;color:#9de8cc;margin:0 0 18px}
+.diagram-group{margin:0}.diagram-label{font:9px/1.8 ui-monospace,monospace;letter-spacing:.07em;color:#a5b4ba;margin:0 0 10px}
+.diagram-flow,.diagram-parallel{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;list-style:none;margin:0;padding:0}
+.diagram-parallel{gap:12px}.diagram-parallel:has(> :last-child:nth-child(2)){grid-template-columns:repeat(2,minmax(0,1fr))}
+.diagram-node{position:relative;min-width:0;margin:0;padding:13px 12px;border:1px solid #40514e;border-radius:4px;background:#151f23;line-height:1.7}
+.diagram-node strong{display:block;color:#d3dfda;font:400 10.5px/1.8 ui-monospace,monospace;overflow-wrap:anywhere}
+.diagram-node span{display:block;margin-top:7px;color:#a5b4ba;font-size:11px;line-height:1.8}
+.diagram-flow>.diagram-node:not(:last-child)::after{content:'→';position:absolute;right:-21px;top:calc(50% - 12px);width:18px;text-align:center;color:#83958f;font-size:16px}
+.diagram-transition{color:#83958f;text-align:center;font:16px/1.4 ui-monospace,monospace;margin:12px 0}
+.diagram-note{font-size:11px;line-height:1.8;color:#a5b4ba;margin:16px 0 0;padding-top:12px;border-top:1px solid #314047;max-width:none}
+@media(max-width:650px){.system-diagram{padding:14px}.diagram-flow,.diagram-parallel,.diagram-parallel:has(> :last-child:nth-child(2)){grid-template-columns:1fr}.diagram-flow{gap:25px}.diagram-flow>.diagram-node:not(:last-child)::after{content:'↓';right:calc(50% - 9px);top:auto;bottom:-25px;height:24px;line-height:24px}.diagram-node strong{font-size:11px}.diagram-label{font-size:9px}}
+.resource-context{font-size:12px;color:#a5b4ba;margin:0 0 16px}
+
+.diagram-divider{border-top:1px solid #314047;margin:18px 0}
+
+/* Shared light-only reader palette, also used by standalone project articles. */
+/* Each route loads a fresh document, so its entrance starts with its content. */
+@keyframes article-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html[data-portfolio-theme="light"] body > main {
+    animation: article-enter 240ms ease-out;
+  }
+}
+html[data-portfolio-theme="light"] { color-scheme: light; }
+html[data-portfolio-theme="light"] body {
+  background: #f5f4ef !important;
+  color: #26322f !important;
+}
+html[data-portfolio-theme="light"] h1,
+html[data-portfolio-theme="light"] strong,
+html[data-portfolio-theme="light"] th { color: #26322f !important; }
+html[data-portfolio-theme="light"] h2,
+html[data-portfolio-theme="light"] h3 {
+  color: #214b3d !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-weight: 600 !important;
+  letter-spacing: -.02em !important;
+  line-height: 1.45 !important;
+  text-transform: uppercase !important;
+}
+html[data-portfolio-theme="light"] h1.breadcrumb,
+html[data-portfolio-theme="light"] .breadcrumb {
+  color: #26322f !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-weight: 700 !important;
+  letter-spacing: .07em !important;
+  text-transform: uppercase !important;
+}
+html[data-portfolio-theme="light"] .diagram-head h2 {
+  color: #26322f !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-weight: 700 !important;
+  letter-spacing: .06em !important;
+  line-height: 1.55 !important;
+  text-transform: uppercase !important;
+}
+html[data-portfolio-theme="light"] p,
+html[data-portfolio-theme="light"] li,
+html[data-portfolio-theme="light"] td,
+html[data-portfolio-theme="light"] small,
+html[data-portfolio-theme="light"] figcaption,
+html[data-portfolio-theme="light"] .lede,
+html[data-portfolio-theme="light"] .diagram-note,
+html[data-portfolio-theme="light"] .resource-context {
+  color: #4d5c57 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] .opening-copy p,
+html[data-portfolio-theme="light"] .diagram-head p,
+html[data-portfolio-theme="light"] .lane-label > p,
+html[data-portfolio-theme="light"] .card p,
+html[data-portfolio-theme="light"] .route > p,
+html[data-portfolio-theme="light"] .tool-card p,
+html[data-portfolio-theme="light"] .bedrock-card p,
+html[data-portfolio-theme="light"] .doc-intro p,
+html[data-portfolio-theme="light"] .doc-heading p,
+html[data-portfolio-theme="light"] .doc-card p {
+  color: #43544e !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.9 !important;
+}
+html[data-portfolio-theme="light"] p,
+html[data-portfolio-theme="light"] li,
+html[data-portfolio-theme="light"] td,
+html[data-portfolio-theme="light"] small,
+html[data-portfolio-theme="light"] figcaption,
+html[data-portfolio-theme="light"] .diagram-node span,
+html[data-portfolio-theme="light"] .workflow-tiles span,
+html[data-portfolio-theme="light"] .mini-flow,
+html[data-portfolio-theme="light"] .closeout-flow > span,
+html[data-portfolio-theme="light"] .remote-flow > span,
+html[data-portfolio-theme="light"] .remote-flow > strong {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] a { color: #17624c !important; }
+html[data-portfolio-theme="light"] .sidebar {
+  background: #f5f4ef !important;
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .site-nav a,
+html[data-portfolio-theme="light"] .project-nav a,
+html[data-portfolio-theme="light"] .nav-label,
+html[data-portfolio-theme="light"] .sidebar-social {
+  color: #5b6b65 !important;
+}
+html[data-portfolio-theme="light"] .site-nav a[aria-current],
+html[data-portfolio-theme="light"] .item-list a[aria-current],
+html[data-portfolio-theme="light"] .project-nav a[aria-current],
+html[data-portfolio-theme="light"] .site-nav a:hover,
+html[data-portfolio-theme="light"] .project-nav a:hover,
+html[data-portfolio-theme="light"] .sidebar-social a[href]:hover {
+  color: #0f6048 !important;
+}
+html[data-portfolio-theme="light"] .sidebar-social {
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .text-view > p:not(.section-label),
+html[data-portfolio-theme="light"] .reading-card p,
+html[data-portfolio-theme="light"] .pipeline-steps p,
+html[data-portfolio-theme="light"] .pipeline-diagram figcaption,
+html[data-portfolio-theme="light"] .logging-rail p {
+  color: #43544e !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+html[data-portfolio-theme="light"] .diagram-head > span,
+html[data-portfolio-theme="light"] .card-label,
+html[data-portfolio-theme="light"] .tag,
+html[data-portfolio-theme="light"] .article-tabs label,
+html[data-portfolio-theme="light"] .doc-intro > span,
+html[data-portfolio-theme="light"] .doc-heading > b,
+html[data-portfolio-theme="light"] .workflow-box > strong,
+html[data-portfolio-theme="light"] .diagram-title,
+html[data-portfolio-theme="light"] .diagram-label,
+html[data-portfolio-theme="light"] .boundary-label,
+html[data-portfolio-theme="light"] .service-badge,
+html[data-portfolio-theme="light"] .arch-cluster-label {
+  color: #0f6048 !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-weight: 600 !important;
+  letter-spacing: .09em !important;
+  text-transform: uppercase !important;
+}
+html[data-portfolio-theme="light"] .notice,
+html[data-portfolio-theme="light"] .card,
+html[data-portfolio-theme="light"] .route,
+html[data-portfolio-theme="light"] .tool-card,
+html[data-portfolio-theme="light"] .bedrock-card,
+html[data-portfolio-theme="light"] .doc-card,
+html[data-portfolio-theme="light"] .diagram-node,
+html[data-portfolio-theme="light"] .arch-service,
+html[data-portfolio-theme="light"] .arch-subnet,
+html[data-portfolio-theme="light"] .arch-node,
+html[data-portfolio-theme="light"] .arch-pod,
+html[data-portfolio-theme="light"] .arch-container,
+html[data-portfolio-theme="light"] .reading-card,
+html[data-portfolio-theme="light"] .pipeline-steps li,
+html[data-portfolio-theme="light"] .pipeline-notes .card,
+html[data-portfolio-theme="light"] .prompt-card,
+html[data-portfolio-theme="light"] .plan-box,
+html[data-portfolio-theme="light"] .plan-flow li,
+html[data-portfolio-theme="light"] .test-fix-loop,
+html[data-portfolio-theme="light"] .closeout-flow > span,
+html[data-portfolio-theme="light"] .workflow-box,
+html[data-portfolio-theme="light"] .workflow-tiles > div,
+html[data-portfolio-theme="light"] .tool-loop,
+html[data-portfolio-theme="light"] .remote-flow > span,
+html[data-portfolio-theme="light"] .remote-flow > strong,
+html[data-portfolio-theme="light"] .logging-rail,
+html[data-portfolio-theme="light"] .custom-tools,
+html[data-portfolio-theme="light"] .collaboration,
+html[data-portfolio-theme="light"] .delivered {
+  background: #fbfaf7 !important;
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .diagram,
+html[data-portfolio-theme="light"] .system-diagram,
+html[data-portfolio-theme="light"] .aws-landscape,
+html[data-portfolio-theme="light"] .mermaid-scroll,
+html[data-portfolio-theme="light"] figure .scroll,
+html[data-portfolio-theme="light"] .pipeline-diagram,
+html[data-portfolio-theme="light"] .pipeline-section {
+  background: #f5f4ef !important;
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .article-tabs { border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] .article-tabs label { color: #5b6b65 !important; }
+html[data-portfolio-theme="light"] .article-tabs label:hover,
+html[data-portfolio-theme="light"] .article-tabs input:checked + label { color: #0f6048 !important; border-bottom-color: #0f6048 !important; }
+html[data-portfolio-theme="light"] .doc-intro { border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] .doc-intro h2,
+html[data-portfolio-theme="light"] .doc-heading h3,
+html[data-portfolio-theme="light"] .doc-card h3 { color: #214b3d !important; }
+html[data-portfolio-theme="light"] .doc-card > small { color: #5b6b65 !important; }
+html[data-portfolio-theme="light"] .implementation-list,
+html[data-portfolio-theme="light"] .code-caption { color: #43544e !important; }
+html[data-portfolio-theme="light"] .validation-strip { background: #edf4ef !important; border-color: #b7c8bf !important; color: #355247 !important; }
+html[data-portfolio-theme="light"] .validation-strip i { color: #17624c !important; }
+html[data-portfolio-theme="light"] .diagram img,
+html[data-portfolio-theme="light"] .mermaid-scroll img {
+  background: transparent !important;
+}
+html[data-portfolio-theme="light"] .mermaid-figure .mermaid-dark { display: none !important; }
+html[data-portfolio-theme="light"] .mermaid-figure .mermaid-light { display: block !important; }
+html[data-portfolio-theme="light"] pre,
+html[data-portfolio-theme="light"] .scroll {
+  background: #f0f3ef !important;
+  border-color: #cbd6d1 !important;
+  color: #26322f !important;
+}
+html[data-portfolio-theme="light"] pre code { background: transparent !important; }
+html[data-portfolio-theme="light"] th { background: #e7eee9 !important; }
+html[data-portfolio-theme="light"] footer { border-color: #cbd6d1 !important; color: #5c6a66 !important; }
+html[data-portfolio-theme="light"] .project-status,
+html[data-portfolio-theme="light"] .plan-box,
+html[data-portfolio-theme="light"] .workflow-box,
+html[data-portfolio-theme="light"] .test-fix-loop,
+html[data-portfolio-theme="light"] .prompt-card,
+html[data-portfolio-theme="light"] .bedrock-card {
+  border-color: #cbd6d1 !important;
+}
+html[data-portfolio-theme="light"] .diagram-title,
+html[data-portfolio-theme="light"] .diagram-label,
+html[data-portfolio-theme="light"] .boundary-label,
+html[data-portfolio-theme="light"] .service-badge,
+html[data-portfolio-theme="light"] .arch-cluster-label { color: #0f6048 !important; }
+html[data-portfolio-theme="light"] .diagram-divider,
+html[data-portfolio-theme="light"] .lane,
+html[data-portfolio-theme="light"] h2 { border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] .card h2,
+html[data-portfolio-theme="light"] .route h2,
+html[data-portfolio-theme="light"] .tool-card h3,
+html[data-portfolio-theme="light"] .bedrock-card h3,
+html[data-portfolio-theme="light"] .collaboration h3,
+html[data-portfolio-theme="light"] .plan-flow strong,
+html[data-portfolio-theme="light"] .workflow-tiles b,
+html[data-portfolio-theme="light"] .cycle-step strong {
+  color: #214b3d !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] .notice > strong,
+html[data-portfolio-theme="light"] .mermaid-scroll th,
+html[data-portfolio-theme="light"] .plan-box > strong,
+html[data-portfolio-theme="light"] .plan-flow li strong,
+html[data-portfolio-theme="light"] .route.complex h2 {
+  color: #26322f !important;
+}
+html[data-portfolio-theme="light"] .notice p,
+html[data-portfolio-theme="light"] .mermaid-scroll td,
+html[data-portfolio-theme="light"] .plan-flow li > span {
+  color: #43544e !important;
+}
+html[data-portfolio-theme="light"] .mermaid-scroll th { background: #e7eee9 !important; border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] .mermaid-scroll td { border-color: #d2dcd7 !important; }
+html[data-portfolio-theme="light"] .mermaid-scroll tbody tr:hover td { background: rgba(23, 98, 76, .05) !important; }
+html[data-portfolio-theme="light"] .diagram-node strong,
+html[data-portfolio-theme="light"] .diagram-node span {
+  color: #26322f !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] .connector,
+html[data-portfolio-theme="light"] .flow-caption,
+html[data-portfolio-theme="light"] .mini-flow,
+html[data-portfolio-theme="light"] .diagram-transition,
+html[data-portfolio-theme="light"] .diagram-footer,
+html[data-portfolio-theme="light"] .path-connector,
+html[data-portfolio-theme="light"] .plan-intro {
+  color: #5b6b65 !important;
+}
+html[data-portfolio-theme="light"] .outcomes span {
+  background: #fbfaf7 !important;
+  border-color: #b7c8bf !important;
+  color: #17624c !important;
+}
+html[data-portfolio-theme="light"] .outcomes span:nth-child(2) {
+  border-color: #c7aaa5 !important;
+  color: #8b3f36 !important;
+}
+html[data-portfolio-theme="light"] .outcomes span:nth-child(3) {
+  border-color: #cdbb98 !important;
+  color: #80551c !important;
+}
+
+/* Shared light surfaces for tables, inline code and syntax-highlighted samples. */
+html[data-portfolio-theme="light"] table,
+html[data-portfolio-theme="light"] tbody,
+html[data-portfolio-theme="light"] tr,
+html[data-portfolio-theme="light"] td { background: #fbfaf7 !important; border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] tbody tr:nth-child(even) td { background: #f0f3ef !important; }
+html[data-portfolio-theme="light"] code { background: #e9efe9 !important; color: #264c3e !important; border-color: #cbd6d1 !important; }
+html[data-portfolio-theme="light"] pre code { background: transparent !important; color: #26322f !important; }
+html[data-portfolio-theme="light"] pre::before { color: #53625d !important; }
+html[data-portfolio-theme="light"] .token.comment { color: #596960 !important; }
+html[data-portfolio-theme="light"] .token.key { color: #245b83 !important; }
+html[data-portfolio-theme="light"] .token.string { color: #306031 !important; }
+html[data-portfolio-theme="light"] .token.number { color: #80511f !important; }
+html[data-portfolio-theme="light"] .token.keyword { color: #6e428c !important; }
+
+
+/* Matte code panels within an otherwise light-only reader. */
+html[data-portfolio-theme="light"] pre,
+html[data-portfolio-theme="light"] .scroll:has(> pre) { background: #1b2023 !important; color: #dbe7e2 !important; border-color: #37423f !important; }
+html[data-portfolio-theme="light"] pre code { background: transparent !important; color: #dbe7e2 !important; border: 0 !important; }
+html[data-portfolio-theme="light"] pre::before { color: #a3b4ad !important; }
+html[data-portfolio-theme="light"] pre .token.comment { color: #a3b4ad !important; }
+html[data-portfolio-theme="light"] pre .token.key { color: #92ccec !important; }
+html[data-portfolio-theme="light"] pre .token.string { color: #b8dda0 !important; }
+html[data-portfolio-theme="light"] pre .token.number { color: #e9bb87 !important; }
+html[data-portfolio-theme="light"] pre .token.keyword { color: #c9b2ef !important; }
+html[data-portfolio-theme="light"] .repository-link { display: inline-flex; align-items: center; justify-content: center; padding: 8px 12px; border: 1px solid #cbd6d1; border-radius: 4px; background: #fbfaf7; color: #17624c !important; font: 700 11px/1.9 ui-monospace, monospace; letter-spacing: .06em; text-transform: uppercase; text-decoration: none; }
+html[data-portfolio-theme="light"] .repository-link:hover { background: #e9efe9; border-color: #17624c; }
+
+
+/* Article-local overrides keep the other portfolio documents unchanged. */
+html[data-portfolio-theme="light"] { --article-accent: #17624c; }
+html[data-portfolio-theme="light"] main h1 { color: var(--article-accent) !important; font-size: 21px; line-height: 1.4; letter-spacing: .025em; text-transform: uppercase; margin: 0 0 10px; }
+main header .lede { margin-bottom: 0; }
+main > section:first-of-type h2 { margin-top: 20px; }
+main h2 { font-size: 15px; margin: 28px 0 12px; padding-top: 12px; }
+main h3 { font-size: 13px; }
+main > section { display: flow-root; }
+main > section > :last-child { margin-bottom: 0; }
+html[data-portfolio-theme="light"] main .notice { background: #e7efe9 !important; border-color: var(--article-accent) !important; border-left-width: 4px; padding: 16px 20px; }
+html[data-portfolio-theme="light"] main .notice > strong { color: var(--article-accent) !important; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+main .notice p, main figcaption, main .diagram-node span { font-size: 13px; }
+main .diagram-flow { gap: 36px; counter-reset: stage; }
+html[data-portfolio-theme="light"] main .diagram-node { background: #edf3ee !important; border-color: #a9c3b5 !important; border-top: 3px solid var(--article-accent) !important; }
+main .diagram-node::before { counter-increment: stage; content: "0" counter(stage); display: block; color: var(--article-accent); font: 700 12px/1.8 ui-monospace, monospace; margin-bottom: 6px; }
+main .diagram-node strong { font: 600 13px/1.6 system-ui, sans-serif; }
+main .diagram-flow > .diagram-node:not(:last-child)::after { right: -32px; width: 28px; font-size: 26px; font-weight: 700; color: var(--article-accent); }
+main .diagram-note { border-color: #cbd6d1; }
+main table { min-width: 580px; font-size: 13px; }
+main caption { text-align: left; padding: 12px 16px; font-weight: 600; background: #e7eee9; }
+html[data-portfolio-theme="light"] main table th,
+html[data-portfolio-theme="light"] main table td { padding: 12px 16px; border: 0; border-bottom: 1px solid #cbd6d1 !important; }
+main .usage-table th:nth-child(2), main .usage-table td:nth-child(2) { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+html[data-portfolio-theme="light"] main tbody th { background: #fbfaf7 !important; font-weight: 600; }
+html[data-portfolio-theme="light"] main tbody tr:nth-child(even) th { background: #f0f3ef !important; }
+html[data-portfolio-theme="light"] main .usage-table tbody tr:last-child > * { background: #e7eee9 !important; border-top: 2px solid var(--article-accent) !important; }
+.explainer, .token-chart, .metric-card { padding: 18px 20px; border: 1px solid #b9ccc1; border-radius: 6px; background: #fbfaf7; }
+main .explainer h2, main .token-chart h3, main .metric-card h3 { margin: 0 0 10px; padding: 0; border: 0; }
+.explainer { margin: 24px 0 0; border-left: 4px solid var(--article-accent); }
+.explainer p:last-child, .metric-card p:last-child { margin-bottom: 0; }
+.composition-bar { display: flex; height: 30px; overflow: hidden; border-radius: 4px; margin: 16px 0; background: #edf3ee; }
+.composition-bar span:nth-child(1) { width: 97.717544%; background: #17624c; }
+.composition-bar span:nth-child(2) { width: 1.898788%; background: #8bb49e; }
+.composition-bar span:nth-child(3) { width: .383668%; background: #ad7132; }
+.chart-key { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; list-style: none; padding: 0; }
+.chart-key li { border-top: 4px solid #17624c; padding-top: 8px; }
+.chart-key li:nth-child(2) { border-color: #8bb49e; }
+.chart-key li:nth-child(3) { border-color: #ad7132; }
+.chart-key strong, .chart-key span { display: block; }
+.metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 18px 0; }
+.metric-value { display: block; color: var(--article-accent); font-size: 23px; font-weight: 650; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.mechanism-example { padding: 14px 18px; background: #e7eee9; border-radius: 4px; }
+@media (max-width: 650px) {
+  html[data-portfolio-theme="light"] main h1 { font-size: 19px; }
+  main h2 { font-size: 14px; margin-top: 24px; padding-top: 10px; }
+  main h3 { margin-top: 20px; }
+  .explainer { margin-top: 20px; }
+  main .diagram-flow { gap: 36px; }
+  main .diagram-flow > .diagram-node:not(:last-child)::after { right: calc(50% - 14px); bottom: -32px; height: 28px; line-height: 28px; }
+  .metric-grid, .chart-key { grid-template-columns: 1fr; }
+  .chart-key { gap: 6px; }
+}
+
+main .report-table { table-layout: fixed; width: 100%; }
+main .report-table th, main .report-table td { text-align: left; white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
+main .architecture { margin: 20px 0; padding: 20px; border: 1px solid #a9c3b5; border-radius: 6px; background: #edf3ee; }
+main details { margin: 18px 0; padding: 16px; border: 1px solid #b9ccc1; border-radius: 6px; }
+main summary { cursor: pointer; font-weight: 600; color: #17624c; }
+main .architecture-mermaid { overflow-x: auto; }
+main .architecture-mermaid > svg { display: block; width: 100%; min-width: 760px; height: auto; margin: 0 auto; }
+/* Match Mermaid's render-time metrics inside its fixed-size label boxes. */
+html[data-portfolio-theme="light"] main .architecture-mermaid foreignObject div,
+html[data-portfolio-theme="light"] main .architecture-mermaid foreignObject span,
+html[data-portfolio-theme="light"] main .architecture-mermaid foreignObject p {
+  font-family: Arial, sans-serif !important;
+  font-size: 15px !important;
+  line-height: 1.5 !important;
+  letter-spacing: normal !important;
+  text-transform: none !important;
+}
+html[data-portfolio-theme="light"] main .architecture-mermaid foreignObject p {
+  margin: 0 !important;
+  padding: 0 !important;
+  max-width: none !important;
+}
+
+main .architecture-step {padding:16px 20px;border:1px solid #a9c3b5;border-left:4px solid #17624c;border-radius:4px;background:#fbfaf7;text-align:center;} main .architecture-step strong, main .architecture-step span {display:block;} main .architecture-step span {margin-top:5px;} main .diagram-parallel .diagram-node::before {content:none;} main .diagram-transition {color:#17624c!important;font-size:23px;margin:10px 0;} main .metric-card h3 {font-size:12px;} main .diagram-note {max-width:none;} @media print {main {max-width:none;} .metric-card,.diagram-node {break-inside:avoid;}}
+
+/* Mermaid exports are isolated images so reader typography cannot resize labels. */
+main .mermaid-diagram {overflow-x:auto;max-width:100%;padding:8px;background:#fbfaf7;border-radius:4px;}
+main .mermaid-diagram img {display:block;width:100%;min-width:900px;height:auto;margin:auto;}
+main .architecture {padding:16px;background:#edf3ee;}
+main .architecture figcaption {margin-top:12px;}
+main .explanation {padding-left:24px;}
+main .explanation li {padding-left:5px;margin:12px 0;}
+main .explanation li::marker {color:#17624c;font-weight:700;}
+main .source-note {font-size:12px;border-left:3px solid #a9c3b5;padding-left:14px;}
+main h3 {margin-top:24px;}
+@media(max-width:650px){main .architecture {margin-inline:0;padding:10px;}main .mermaid-diagram img{min-width:900px;}}
+
+
+/* Static syntax highlighting; code text remains selectable and copyable. */
+html[data-portfolio-theme="light"] main pre{background:#18232d!important;color:#e6edf3!important;padding:16px 20px;}
+html[data-portfolio-theme="light"] main pre code{background:transparent!important;color:#e6edf3!important;font-size:12px;line-height:1.8;}
+main pre::before{color:#9eb3c5;}
+main .hljs-keyword,main .hljs-literal,main .hljs-selector-tag{color:#ff9db0!important;}
+main .hljs-string,main .hljs-attr,main .hljs-template-variable{color:#a5d6ff!important;}
+main .hljs-number,main .hljs-symbol{color:#e9b97d!important;}
+main .hljs-comment,main .hljs-meta{color:#a7b7c7!important;}
+main .hljs-title,main .hljs-built_in,main .hljs-type{color:#d2b4ff!important;}
+main .hljs-variable,main .hljs-params{color:#e6edf3!important;}
+
+/* Compact editorial title and deployment figure. */
+html[data-portfolio-theme="light"] main h1 {font-size:19px;line-height:1.45;letter-spacing:normal;text-transform:none;}
+main .mermaid-diagram img[data-diagram="deployment"] {width:100%;max-width:640px;min-width:0;margin-inline:auto;}
+@media(max-width:650px){html[data-portfolio-theme="light"] main h1{font-size:17px;}main .mermaid-diagram img[data-diagram="deployment"]{min-width:520px;}}
+
+main .breadcrumb{font:11px/1.8 ui-monospace,monospace;color:#5b6b65;margin:0 0 12px;} main .mermaid-diagram img{min-width:680px;} main .source-path{overflow-wrap:anywhere;} @media print{main .mermaid-diagram img{min-width:0;}}
+
+/* Guide rebuild: compact static figures and a responsive six-step request flow. */
+main { min-width: 0; overflow-wrap: anywhere; }
+html[data-portfolio-theme="light"] main > header > h1 { margin-bottom: 32px; }
+main .mermaid-diagram { margin: 20px auto; padding: 8px; overflow: visible; background: transparent; }
+main .mermaid-diagram.architecture { max-width: 560px; border: 0; }
+main .mermaid-diagram.memory { max-width: 450px; overflow-x: auto; }
+main .mermaid-diagram.memory img { min-width: 340px; }
+main .mermaid-diagram img { display: block; width: 100%; max-width: 100%; min-width: 0; height: auto; }
+main .mermaid-diagram figcaption { margin-top: 12px; font-size: 12px; }
+main .request-flow { max-width: 780px; margin: 20px auto; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; }
+main .request-flow li { position: relative; min-width: 0; margin: 0; padding: 16px 10px; border: 1px solid #a9c3b5; border-radius: 4px; background: #fbfaf7; text-align: center; }
+main .request-flow li:nth-child(4) { grid-column: 3; grid-row: 2; }
+main .request-flow li:nth-child(5) { grid-column: 2; grid-row: 2; }
+main .request-flow li:nth-child(6) { grid-column: 1; grid-row: 2; }
+main .request-flow li:not(:last-child)::after { content: '→'; position: absolute; left: 100%; top: calc(50% - 16px); width: 36px; height: 32px; color: #17624c; text-align: center; font-size: 23px; line-height: 32px; }
+main .request-flow li:nth-child(3)::after { content: '↓'; left: calc(50% - 18px); top: 100%; height: 36px; line-height: 36px; }
+main .request-flow li:nth-child(4)::after, main .request-flow li:nth-child(5)::after { content: '←'; left: auto; right: 100%; }
+main .request-flow strong { font-size: 12px; }
+main .implementation-scroll { max-height: 574px; overflow: auto; scrollbar-gutter: stable; }
+main .implementation-scroll table { width: 1000px; min-width: 1000px; }
+main .implementation-scroll th, main .implementation-scroll td { padding: 10px 12px; }
+main .implementation-scroll thead { position: sticky; top: 0; z-index: 1; }
+main .implementation-scroll th { background: #e7eee9 !important; }
+main .scroll { min-width: 0; }
+main a:focus-visible, main [tabindex]:focus-visible { outline-color: #17624c; }
+@media (max-width: 650px) {
+  main .mermaid-diagram img { min-width: 0; }
+  main .mermaid-diagram.memory img { min-width: 340px; }
+  main .request-flow { grid-template-columns: 1fr; gap: 32px; max-width: 340px; }
+  main .request-flow li:nth-child(n) { grid-column: auto; grid-row: auto; padding: 12px 14px; }
+  main .request-flow li:not(:last-child)::after { content: '↓'; left: calc(50% - 18px); right: auto; top: 100%; height: 32px; line-height: 32px; }
+}
+
+.repository-links { display: flex; flex-wrap: wrap; gap: 8px; }
+html[data-portfolio-theme="light"] .repository-links .repository-link { gap: 8px; max-width: 100%; text-transform: none; letter-spacing: normal; text-align: left; }
+.repository-links .repository-link svg { flex: 0 0 18px; }
+.repository-links .repository-link span { min-width: 0; overflow-wrap: anywhere; }
+.repository-links .repository-link:focus-visible { outline: 2px solid currentColor; outline-offset: 4px; }
+html[data-portfolio-theme="light"] main .repository-note { margin: 12px 0 0; font-size: 11px; line-height: 1.8; color: #53625d !important; }
+.repository-divider { margin: 20px 0 24px; border: 0; border-top: 1px solid #cbd6d1; }
+</style>
+</head>
+<body>
+<main>
+<header><p class="breadcrumb">Projects / LangGraph, scoped Deep Agents and Codex: implementation guide</p><h1>LangGraph, scoped Deep Agents and Codex: implementation guide</h1><nav class="repository-links" aria-label="Project repositories"><a class="repository-link" data-repository href="https://github.com/gopalcb/deep-agent-harness-with-codex" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="currentColor"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.043-1.61-4.043-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.73.083-.73 1.205.085 1.838 1.237 1.838 1.237 1.07 1.835 2.807 1.305 3.492.998.108-.776.418-1.305.762-1.605-2.665-.303-5.467-1.333-5.467-5.93 0-1.31.468-2.38 1.235-3.22-.123-.303-.535-1.523.117-3.176 0 0 1.008-.323 3.301 1.23A11.5 11.5 0 0112 6.3c1.02.005 2.047.138 3.005.404 2.291-1.553 3.297-1.23 3.297-1.23.654 1.653.242 2.873.12 3.176.77.84 1.232 1.91 1.232 3.22 0 4.61-2.807 5.624-5.48 5.921.43.372.814 1.102.814 2.222 0 1.606-.015 2.898-.015 3.293 0 .322.216.694.825.576C20.565 22.296 24 17.797 24 12.5 24 5.87 18.627.5 12 .5z"/></svg><span>deep-agent-harness-with-codex</span></a><a class="repository-link" data-repository href="https://github.com/gopalcb/agent-runtime-controller" target="_blank" rel="noopener noreferrer"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false" fill="currentColor"><path d="M12 .5C5.37.5 0 5.87 0 12.5c0 5.3 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.043-1.61-4.043-1.61-.546-1.387-1.333-1.756-1.333-1.756-1.09-.745.083-.73.083-.73 1.205.085 1.838 1.237 1.838 1.237 1.07 1.835 2.807 1.305 3.492.998.108-.776.418-1.305.762-1.605-2.665-.303-5.467-1.333-5.467-5.93 0-1.31.468-2.38 1.235-3.22-.123-.303-.535-1.523.117-3.176 0 0 1.008-.323 3.301 1.23A11.5 11.5 0 0112 6.3c1.02.005 2.047.138 3.005.404 2.291-1.553 3.297-1.23 3.297-1.23.654 1.653.242 2.873.12 3.176.77.84 1.232 1.91 1.232 3.22 0 4.61-2.807 5.624-5.48 5.921.43.372.814 1.102.814 2.222 0 1.606-.015 2.898-.015 3.293 0 .322.216.694.825.576C20.565 22.296 24 17.797 24 12.5 24 5.87 18.627.5 12 .5z"/></svg><span>agent-runtime-controller</span></a></nav><p class="repository-note">Runtime Controller is the predecessor, built around a Codex-only workflow. This version introduces a hybrid backend: LangGraph and a scoped Deep Agents harness coordinate selected workflow steps, while the NestJS/Codex execution layer handles sandboxed repository changes and command execution.</p><hr class="repository-divider"></header>
+<p><strong>This lab uses Deep Agents to help prepare a plan, LangGraph to move that plan forward, and Codex to perform coding work.</strong> These are connected layers with different responsibilities.</p>
+<ul>
+<li><strong>Deep Agents is scoped:</strong> the live planner can organize work, read/write planning artifacts, consult skills and delegate bounded research. It does not receive a repository shell or unrestricted coding access.</li>
+<li><strong>LangGraph coordinates:</strong> it advances the run, checks dependencies, persists progress and decides when to dispatch, verify, repair or wait.</li>
+<li><strong>NestJS owns Codex:</strong> Python sends validated task assignments over HTTP; NestJS alone starts/resumes Codex threads and runs registered verification commands.</li>
+<li><strong>Demo mode is credential-free simulation:</strong> real services, graph and persistence run, but planning and coding are deterministic fixtures. Live inference is a separate configuration and acceptance step.</li>
+</ul>
+<h2 id="1-scoped-deep-agents-harness">1. Scoped Deep Agents harness</h2>
+<p>A <strong>harness</strong> provides a model with tools, instructions, delegation, context management and persistence. It controls which capabilities the model can use.</p>
+<p>In this project, <code>DeepPlanner.build_agent()</code> calls <code>create_deep_agent()</code>. The resulting agent prepares a structured engineering plan inside a per-run artifact directory. It is not the component that edits the target repository.</p>
+<div class="scroll" role="region" tabindex="0" aria-label="Deep Agents capabilities and boundaries"><table>
+<thead>
+<tr>
+<th scope="col">Capability</th>
+<th scope="col">How this lab applies it</th>
+<th scope="col">Boundary to remember</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Planning and to-dos</td>
+<td>Deep Agents provides planning support; the final response must match <code>PlanOutput</code></td>
+<td>A model to-do list is not the authoritative execution DAG</td>
+</tr>
+<tr>
+<td>Filesystem tools</td>
+<td>Planner reads/writes notes and context in its run&#39;s planning-artifact directory</td>
+<td>No repository filesystem or shell tool is supplied</td>
+</tr>
+<tr>
+<td>Skills</td>
+<td>Trusted <code>research</code> and <code>documentation</code> skill files are staged under <code>/skills/</code></td>
+<td>A skill is guidance, not a new worker or permission grant</td>
+</tr>
+<tr>
+<td>Subagent delegation</td>
+<td>The <code>task</code> tool can invoke a restricted research agent</td>
+<td>Research reads supplied artifacts; it cannot edit code, execute commands or recursively delegate</td>
+</tr>
+<tr>
+<td>Context management</td>
+<td>SDK summarization/offload plus project middleware keep planner input bounded</td>
+<td>Estimates are heuristic; they do not measure the coding assistant&#39;s native context window</td>
+</tr>
+<tr>
+<td>Scoped coordination tools</td>
+<td>Memory lookup/candidates and approval-request signaling</td>
+<td>Server code binds project/run identity and enforces policy</td>
+</tr>
+<tr>
+<td>Checkpointing</td>
+<td>The live planner receives a real checkpointer and a dedicated thread key</td>
+<td>Planner checkpoints and Codex threads are separate state</td>
+</tr>
+</tbody></table></div>
+<p><strong>Features deliberately outside this scope:</strong> a general Deep Agents coding shell, arbitrary subagent creation, automatic worktree management and unrestricted external tools. NestJS/Codex retains the coding boundary. Optional MCP/document capabilities require explicit configuration and permissions.</p>
+<h3 id="where-the-layers-connect">Where the layers connect</h3>
+<figure class="mermaid-diagram architecture"><img data-diagram="architecture" alt="NestJS gateway forwards to FastAPI and LangGraph. A direct assignment or scoped live Deep Agents planner produces tasks; Python sends them to the NestJS Codex execution owner, which returns registered check evidence to the coordinator." src="/projects/assets/deep-agent-harness/architecture.svg"><figcaption>Planning artifacts and read-only research remain inside the scoped harness. NestJS owns coding execution and registered verification.</figcaption></figure>
+
+
+<ul>
+<li><strong>Direct:</strong> constructs one assignment without invoking a planner.</li>
+<li><strong>Planned, demo:</strong> <code>DemoPlanner</code> returns <code>implement → verify</code>; it never calls Deep Agents or a model.</li>
+<li><strong>Planned, live:</strong> <code>DeepPlanner</code> invokes the scoped harness and validates its returned plan.</li>
+<li><strong>Return path:</strong> task status, check evidence and events travel back to Python, then through the gateway to the caller.</li>
+</ul>
+<h2 id="2-request-flow-from-start-to-finish">2. Request flow from start to finish</h2>
+<p>The flow moves left to right, then down and back across the second row. On smaller screens, it runs from top to bottom.</p>
+<ol class="request-flow" aria-label="Request flow: read the top row left to right, then the bottom row right to left"><li><strong>Receive request</strong></li>
+<li><strong>Save run</strong></li>
+<li><strong>Plan tasks</strong></li>
+<li><strong>Hand off to Codex</strong></li>
+<li><strong>Execute and check</strong></li>
+<li><strong>Reconcile result</strong></li></ol>
+
+
+<ul>
+<li><strong>Submission is not completion.</strong> The execution API admits a task before its coding turn finishes; later coordinator turns collect the result.</li>
+<li><strong>Same request, same identity:</strong> unchanged duplicate submissions reuse the admitted work. Reusing an identity with a changed payload is rejected.</li>
+<li><strong>Checks decide success:</strong> a completed Codex turn or a persuasive response alone does not finish the workflow.</li>
+<li><strong>Progress reaches the caller through two channels:</strong> status responses show current state; replayable events explain what happened.</li>
+</ul>
+<h2 id="3-implementation-files-and-responsibilities">3. Implementation files and responsibilities</h2>
+<p>The table maps each responsibility to its source files. The <code>code-map.yaml</code> and <code>docs/contracts.md</code> provide the full inventory.</p>
+<div class="scroll implementation-scroll" role="region" tabindex="0" aria-label="Implementation files and responsibilities"><table>
+<thead>
+<tr>
+<th scope="col">Question</th>
+<th scope="col">Source entry points</th>
+<th scope="col">What is implemented there</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>How do requests enter?</td>
+<td><code>services/control-plane/src/main.ts</code>, <code>services/agent-orchestrator/src/orchestrator/api.py</code>, <code>services/agent-orchestrator/src/orchestrator/routing.py</code></td>
+<td>Gateway/authentication, run routes, service construction and scheduler</td>
+</tr>
+<tr>
+<td>What advances a run?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/workflow.py</code>: <code>create</code>, <code>advance</code>, <code>coordinate</code>, <code>execute_task</code></td>
+<td>Graph, task selection, dispatch, reconciliation, approval and repair</td>
+</tr>
+<tr>
+<td>How is a plan built?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/planning.py</code>: <code>build_agent</code>, <code>plan</code>, <code>stage_skills</code></td>
+<td>Demo/live planners, restricted research, skills and structured output</td>
+</tr>
+<tr>
+<td>What can an agent call?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/tools.py</code>: <code>ScopedTools</code>, <code>MCPTools</code></td>
+<td>Bound tool scope, permissions and external capability restrictions</td>
+</tr>
+<tr>
+<td>What keeps context bounded?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/context.py</code></td>
+<td>Prompt estimate, summarization observation and final input guard</td>
+</tr>
+<tr>
+<td>How does Python reach Codex?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/codex_client.py</code></td>
+<td>HTTP start/status/resume/cancel/events; no SDK thread ownership</td>
+</tr>
+<tr>
+<td>Where does coding happen?</td>
+<td><code>services/control-plane/src/execution.ts</code>: <code>ExecutionService</code>, <code>SDKTransport</code></td>
+<td>Codex SDK invocation, cancellation, registered checks and diff artifacts</td>
+</tr>
+<tr>
+<td>How is state retained?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/storage.py</code>, <code>services/control-plane/src/store.ts</code></td>
+<td>Python scoped records; Node task journal, leases and idempotent admission</td>
+</tr>
+<tr>
+<td>How are logs collected?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/events.py</code></td>
+<td>Redacted event admission, replay and JSONL export</td>
+</tr>
+<tr>
+<td>What validates trust decisions?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/validation.py</code>, <code>services/agent-orchestrator/src/orchestrator/memory.py</code>, <code>services/agent-orchestrator/src/orchestrator/workspaces.py</code></td>
+<td>DAG/check validation, memory review and exact-action approval digest</td>
+</tr>
+<tr>
+<td>Where are optional integrations?</td>
+<td><code>services/agent-orchestrator/src/orchestrator/integrations.py</code>, <code>services/agent-orchestrator/src/orchestrator/integration_routes.py</code>, <code>services/agent-orchestrator/src/orchestrator/documents.py</code></td>
+<td>Explicit MCP/document routes, permission checks and publication receipts</td>
+</tr>
+</tbody></table></div>
+<p><strong>Library roles:</strong> LangGraph supplies graph/checkpoint primitives; LangChain supplies model initialization and the research agent; Deep Agents supplies the planning harness; FastAPI/httpx connect Python services; NestJS and the TypeScript Codex SDK own coding execution. Dependency versions are pinned by the <code>services/agent-orchestrator/uv.lock</code> and <code>package-lock.json</code>. Installed PostgreSQL-checkpointer and structlog dependencies are not the selected runtime persistence/logging pipeline.</p>
+<h2 id="4-tool-calls-delegation-and-handoffs">4. Tool calls, delegation and handoffs</h2>
+<p>These are three different actions. Treating them separately makes the execution trace easier to read.</p>
+<h3 id="tool-calls">Tool calls</h3>
+<ul>
+<li>The live planner model chooses an exposed tool and arguments.</li>
+<li>The harness executes that tool and returns its result to the model&#39;s conversation.</li>
+<li>Filesystem tools operate under the run&#39;s artifact root: the planner can <code>ls</code>, <code>read_file</code>, <code>write_file</code>, <code>edit_file</code>, <code>glob</code> and <code>grep</code>.</li>
+<li>Custom coordination tools include <code>retrieve_project_memory</code>, <code>save_memory_candidate</code> and <code>request_approval</code>, subject to their permission checks.</li>
+<li><code>ScopedTools</code> binds the project/run on the server, rejects model-supplied scope overrides and records redacted custom-tool activity.</li>
+<li><code>request_approval</code> signals a request; it does <strong>not</strong> grant approval or itself implement the workflow&#39;s persisted pause.</li>
+</ul>
+<p><strong>Example:</strong> the planner writes a requirements note, then reads a staged skill before producing a task plan. Those actions operate on planning context; neither launches Codex.</p>
+<h3 id="research-delegation">Research delegation</h3>
+<ul>
+<li>The planner may call Deep Agents&#39; <code>task</code> tool when research would help; delegation is not mandatory for every plan.</li>
+<li>The configured <code>general-purpose</code> subagent is replaced with a restricted research runnable.</li>
+<li>It receives its own model conversation and read-only tools: <code>ls</code>, <code>read_file</code>, <code>glob</code>, <code>grep</code>.</li>
+<li>It shares the run&#39;s artifact backend with the planner, so it can inspect supplied notes. Separate conversational context does not mean separate file storage.</li>
+<li>It returns findings to the planner, which incorporates them into the structured plan.</li>
+<li>It has no repository shell, write tools or recursive <code>task</code> delegation tool.</li>
+</ul>
+<p><strong>Example:</strong> “Read the supplied requirements and identify dependencies” is appropriate research. “Edit the service and run npm tests” belongs to the Codex execution boundary.</p>
+<h3 id="coding-dispatch">Coding dispatch</h3>
+<ul>
+<li>The planner returns <code>PlanOutput</code>; it does not directly start a coding thread.</li>
+<li>Trusted Python code fills project/run identity, risk, idempotency and execution defaults, then validates task IDs, scopes and dependency cycles.</li>
+<li><code>WorkflowService.execute_task()</code> calls <code>CodexClient</code> with a validated assignment.</li>
+<li>NestJS admits that assignment, owns its workspace lease and invokes Codex.</li>
+<li>Python later receives a result containing status, thread ID, checks, artifacts, usage and any error; it decides the next workflow action.</li>
+</ul>
+<p><strong>This handoff transfers a task contract, not an entire model conversation.</strong> Research context, planner checkpoint state, the workflow run record and the Codex thread remain distinct.</p>
+<p>The tool library contains an <code>invoke_codex_task</code> branch, but it is not wired as the default planner&#39;s dispatch tool. The actual execution path is the coordinator&#39;s HTTP call. Likewise, optional status/document tools require dependencies that the default planner does not receive.</p>
+<h2 id="5-langgraph-execution">5. LangGraph execution</h2>
+<p>The custom workflow graph is deliberately small: <strong><code>START → coordinate → END</code></strong>.</p>
+<ul>
+<li><strong>One application node:</strong> planning, dispatch and verification are branches inside <code>coordinate()</code> and its helpers, not separate compiled graph nodes.</li>
+<li><strong>Two kinds of graph:</strong> the LangGraph execution graph has one coordinator node; the engineering plan is a task dependency DAG stored as application data.</li>
+<li><strong>Small checkpoint state:</strong> <code>GraphState</code> carries <code>project_id</code>, <code>run_id</code> and <code>status</code>. Full tasks, approvals, results and dispatch intent live in the run record.</li>
+<li><strong>Bounded advancement:</strong> a scheduler advances active runs roughly once per second. A status GET may also advance eligible runs; it is not always a passive read.</li>
+<li><strong>Serial scheduling:</strong> the current coordinator advances one dependency-ready task per turn. A dependency DAG does not imply parallel coding workers.</li>
+<li><strong>Explicit route:</strong> Direct/Planned comes from the request preset; no automatic complexity classifier chooses it.</li>
+</ul>
+<div class="scroll" role="region" tabindex="0" aria-label="Run and execution identifiers"><table>
+<thead>
+<tr>
+<th scope="col">Identifier</th>
+<th scope="col">What it resumes or correlates</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>project_id:run_id</code></td>
+<td>Coordinator checkpoint thread</td>
+</tr>
+<tr>
+<td><code>planning:project_id:run_id</code></td>
+<td>Live planner checkpoint thread</td>
+</tr>
+<tr>
+<td>Codex <code>thread_id</code></td>
+<td>Coding conversation owned by NestJS</td>
+</tr>
+<tr>
+<td>Task identity and idempotency key</td>
+<td>Admission/reconciliation of one execution assignment</td>
+</tr>
+</tbody></table></div>
+<h2 id="6-codex-execution-and-credentials">6. Codex execution and credentials</h2>
+<h3 id="what-nestjs-does-with-the-sdk">What NestJS does with the SDK</h3>
+<ul>
+<li><code>SDKTransport</code> constructs <code>Codex</code>, calls <code>startThread()</code> or <code>resumeThread()</code>, then <code>runStreamed()</code>.</li>
+<li>Working directory comes from the server&#39;s registered workspace, not an arbitrary caller-provided path.</li>
+<li>Execution selects read-only/workspace-write policy, disables workspace network access and sets <code>approvalPolicy: &quot;never&quot;</code>.</li>
+<li>NestJS saves the thread ID and selected stream metadata, then runs registered verification commands with bounded time/output.</li>
+<li>Checks use registered executable/argument arrays; requests cannot inject arbitrary verification commands.</li>
+<li>Diff artifacts capture Git diffs; they are not a complete snapshot of untracked files.</li>
+<li>Known failed checks can trigger up to two same-thread repair attempts. An uncertain remote outcome must be reconciled before retrying execution.</li>
+</ul>
+<h3 id="which-mode-needs-which-authentication">Which mode needs which authentication?</h3>
+<div class="scroll" role="region" tabindex="0" aria-label="Authentication requirements by execution mode"><table>
+<thead>
+<tr>
+<th scope="col">Path</th>
+<th scope="col">Requirement</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Demo planner + demo transport</td>
+<td>No model credentials; no real model inference</td>
+</tr>
+<tr>
+<td>Internal Python ↔ Node calls</td>
+<td>Matching service bearer, separate from model authentication</td>
+</tr>
+<tr>
+<td>Live Codex SDK</td>
+<td>Codex authentication available to its process; supported ChatGPT sign-in can avoid a separate API key</td>
+</tr>
+<tr>
+<td>Live Deep Agents planner</td>
+<td><code>LAB_PLANNER_MODEL</code>, the selected LangChain provider package and its credentials</td>
+</tr>
+<tr>
+<td>Optional document/MCP operations</td>
+<td>Separate service configuration and permissions</td>
+</tr>
+</tbody></table></div>
+<ul>
+<li><strong>There is no Codex-backed planner adapter in this implementation.</strong> LangGraph can coordinate Codex through the HTTP adapter, but <code>DeepPlanner</code> still calls <code>init_chat_model()</code>.</li>
+<li><code>langchain-openai</code> is not currently declared. Installing the Codex SDK alone does not configure an OpenAI LangChain model.</li>
+<li>Live startup constructs the planner even for Direct requests, so it currently requires planner configuration before serving them.</li>
+<li>The demo launcher forces demo mode; changing a parent environment flag does not turn <code>npm run demo</code> into live inference.</li>
+</ul>
+<h2 id="7-planner-skills-and-context">7. Planner skills and context</h2>
+<ul>
+<li><strong>Stage trusted skills:</strong> copy only <code>research</code> and <code>documentation</code> skill files into the run backend; reject symlinks/path escapes and files over 32,000 bytes.</li>
+<li><strong>Load guidance:</strong> both planner and researcher receive the scoped skills location. Documentation guidance does not create a documentation worker or automatically publish anything.</li>
+<li><strong>Keep external content untrusted:</strong> supplied artifacts and bounded visual-target metadata inform the task without granting permissions.</li>
+<li><strong>Produce a bounded plan:</strong> structured output allows 1–16 tasks; trusted code validates dependencies and fills execution policy.</li>
+</ul>
+<h3 id="when-the-planner-conversation-grows">When the planner conversation grows</h3>
+<ul>
+<li>Estimate input using <code>ceil(serialized UTF-8 bytes / 2)</code>.</li>
+<li>Default capacity is 32,000 with 4,096 reserved; the final guard is 70% of the remainder: <strong>19,532 estimated tokens</strong>.</li>
+<li>SDK summarization starts earlier to leave space for system instructions and tool schemas; it retains the latest two messages and offloads history to the backend.</li>
+<li>The final request wrapper recounts system content, messages and tool schemas. If still over the guard, it refuses the call and reports that a handoff is required.</li>
+<li>An offload event is recorded only when a conversation-history file actually changes, with a path/hash reference.</li>
+</ul>
+<p><strong>Limits:</strong> this is a heuristic budget, not exact provider-token accounting. It does not inspect native Codex context occupancy or automatically create a fresh coding thread. The final guard should not be interpreted as exact accounting for every internal summarization-model call.</p>
+<h2 id="8-state-artifacts-and-logs">8. State, artifacts and logs</h2>
+<p>Use the actual shared <code>LAB_DATA_DIR</code>. The demo uses <code>.runtime</code>; manual service defaults differ, so configure an explicit absolute directory for both processes.</p>
+<div class="scroll" role="region" tabindex="0" aria-label="State and artifact storage locations"><table>
+<thead>
+<tr>
+<th scope="col">Location under the data directory</th>
+<th scope="col">Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>records.sqlite</code></td>
+<td>Runs, request admissions, memory and document records; unified event ledger</td>
+</tr>
+<tr>
+<td><code>checkpoints.sqlite</code></td>
+<td>Coordinator and planner checkpoints</td>
+</tr>
+<tr>
+<td><code>control.sqlite</code></td>
+<td>Node tasks, leases, resumes and source events</td>
+</tr>
+<tr>
+<td><code>planning-artifacts/&lt;project&gt;/&lt;run&gt;/</code></td>
+<td>Scoped skills, planning files and offloaded conversation history</td>
+</tr>
+<tr>
+<td><code>artifacts/&lt;run&gt;/&lt;task&gt;/</code></td>
+<td>Service-owned Git diff artifacts</td>
+</tr>
+<tr>
+<td><code>events/events-*.jsonl</code></td>
+<td>Export of the unified event history</td>
+</tr>
+<tr>
+<td><code>workspace/result.json</code></td>
+<td>Demo fixture output</td>
+</tr>
+</tbody></table></div>
+<h3 id="how-logs-are-collected">How logs are collected</h3>
+<ul>
+<li><strong>Python emits workflow events:</strong> run progress, planning, gates, reconciliation and context activity.</li>
+<li><strong>NestJS journals execution events:</strong> task lifecycle and selected Codex item/usage metadata.</li>
+<li><strong>Python collects Node events:</strong> it tracks the Node source cursor and adds collected events to its unified ledger.</li>
+<li><strong>EventCollector validates and redacts:</strong> duplicate event IDs with identical original payloads reuse the stored event; changed payloads under the same ID are rejected.</li>
+<li><strong>SQLite is the durable event source:</strong> the collector assigns a global sequence and exports redacted JSONL pages.</li>
+<li><strong>Correlation fields connect the story:</strong> project, run, workflow, task/node, agent and thread references identify which work an event belongs to. Durations are populated where measured; zero is not a measured execution time.</li>
+</ul>
+<h3 id="how-events-reach-the-timeline">How events reach the timeline</h3>
+<ul>
+<li>Python exposes event replay as JSON pages; Node polls and converts it to server-sent events (SSE).</li>
+<li>Node accepts a replay cursor through <code>Last-Event-ID</code> or <code>after</code>; the UI reconnects and deduplicates events.</li>
+<li>Node&#39;s source sequence and Python&#39;s unified sequence are different cursors. Event IDs preserve identity across collection.</li>
+<li>Collection uses bounded pages, including follow-up collection after a task reaches a terminal state.</li>
+<li>The UI keeps a bounded in-memory buffer; a visible timeline is not the full persisted history.</li>
+</ul>
+<h3 id="log-contents-and-limits">Log contents and limits</h3>
+<ul>
+<li>Selected Codex event types and usage are collected; raw prompts, full model output and SDK tool arguments are not copied into that stream.</li>
+<li>Registered checks save status/exit evidence; their stdout/stderr are not retained in the event log.</li>
+<li>Process stdout/stderr goes to the launching terminal; there is no automatic terminal-output log file.</li>
+<li>Event redaction does <strong>not</strong> sanitize every run record, checkpoint, history file or diff. Those local stores may contain task content.</li>
+<li>JSONL export currently rebuilds history on append/startup. Approximate 1 MB file rotation is not a retention policy; large histories increase export cost.</li>
+<li>Native Codex journals are separate; this service does not import them wholesale. Local events do not require LangSmith tracing.</li>
+</ul>
+<h2 id="9-memory-approvals-and-recovery">9. Memory, approvals and recovery</h2>
+<p>These mechanisms answer three different questions: <strong>What may we reuse? What may we execute? What do we know after an interruption?</strong></p>
+<figure class="mermaid-diagram memory" tabindex="0" role="region" aria-label="Memory, approvals and recovery diagram; scroll horizontally on small screens"><img data-diagram="memory" alt="Three separate paths: verified outcomes become memory candidates reviewed before reuse; exact proposed actions pass a persisted approval gate and execution policy check; interrupted dispatches query the execution journal to reconcile status." src="/projects/assets/deep-agent-harness/memory.svg"><figcaption>Memory review, exact-action approval and dispatch reconciliation maintain separate trust boundaries.</figcaption></figure>
+
+
+<h3 id="memory-review">Memory review</h3>
+<ul>
+<li>Verified successful outcomes create candidates with source, passing-check evidence and a 30-day expiry.</li>
+<li>Explicit promotion requires reviewer identity and evidence metadata; it does not rerun those checks.</li>
+<li>Retrieval includes only reviewed, nonexpired, noninvalidated entries from the current project.</li>
+<li>Matching is bounded lexical search, not vector search.</li>
+<li>Promotion/invalidation are Python methods; a dedicated operator UI/API is not implemented.</li>
+</ul>
+<p>A later task can reuse a memory candidate only after review and while it remains valid.</p>
+<h3 id="exact-action-approvals">Exact-action approvals</h3>
+<ul>
+<li>Sensitive work persists <code>waiting_approval</code> before dispatch.</li>
+<li>Approval binds to an assignment digest; changing the action/revision requires fresh approval.</li>
+<li>Denial ends the run without coding dispatch.</li>
+<li>This uses application state and an approval endpoint, not LangGraph <code>interrupt()</code> / <code>Command(resume=...)</code>.</li>
+<li>NestJS still rejects sensitive execution: the protected-action executor is not implemented. Approval cannot create a missing execution capability.</li>
+</ul>
+<p>Approval records consent for a particular action. The execution service must still support and permit it.</p>
+<h3 id="recovery-after-interruption">Recovery after interruption</h3>
+<ul>
+<li>Python saves uncertain dispatch intent <strong>before</strong> calling the external task API.</li>
+<li>On timeout or restart, it asks for existing task status instead of blindly starting another coding turn.</li>
+<li>Node marks unresolved execution uncertain after restart and retains its workspace lease.</li>
+<li>Cancellation is recorded first; requesting abort is not proof that execution has stopped.</li>
+<li>Known failed checks allow bounded repair. Unknown execution outcome requires reconciliation.</li>
+<li>Exact, parent and child workspace roots conflict under Node&#39;s lease checks; do not delete a lease to force a retry.</li>
+</ul>
+<p>If a response is lost, the task may still have run. Recovery checks the execution journal; the graph checkpoint alone cannot establish what happened in the other service.</p>
+<p><strong>Deployment boundary:</strong> one Python coordinator and one Node execution owner are supported. Serial scheduling and SQLite transactions do not establish distributed or universal exactly-once execution.</p>
+<h2 id="10-optional-integrations">10. Optional integrations</h2>
+<ul>
+<li><strong>Configure and permit explicitly:</strong> constructing integrations makes no network call. Document operations need <code>LAB_DOCUMENT_URL</code> / <code>LAB_DOCUMENT_TOKEN</code>; MCP needs <code>LAB_MCP_URL</code> / <code>LAB_MCP_TOKEN</code> and per-agent <code>LAB_MCP_TOOLS</code> allowlists. <code>LAB_INTEGRATION_PERMISSIONS</code> enables selected publish, reconcile, search or MCP capabilities.</li>
+<li><strong>Keep routes scoped:</strong> <code>/v1/runs/{run_id}/integrations</code> requires internal authentication and an existing scoped run. The current browser gateway does not proxy these routes.</li>
+<li><strong>Restrict MCP:</strong> use a configured HTTPS Streamable HTTP endpoint, allowed tool names and server-injected scope; reject credential-bearing redirects and treat returned content as untrusted.</li>
+<li><strong>Verify publication:</strong> journal the exact content hash before sending, require a matching <code>READY</code> receipt and reconcile unknown outcomes before resubmitting.</li>
+<li><strong>Separate service contracts:</strong> the lab adapter does not implement private login, OTP, token refresh or automatic workspace-uploader compatibility. Publication is not automatic on completion; uploading this guide separately does not prove the lab integration.</li>
+</ul>
+<h2 id="11-tests-and-verification-evidence">11. Tests and verification evidence</h2>
+<p>The guide is grounded in implementation inspection and earlier analysis. These test suites describe coverage; runtime tests were not rerun for this article.</p>
+<ul>
+<li><strong>Planner and coordination:</strong> <code>services/agent-orchestrator/tests/test_planning_context.py</code> exercises harness construction with injected models; <code>services/agent-orchestrator/tests/test_workflow.py</code> covers DAGs, idempotency, approvals, repair and verification gates.</li>
+<li><strong>Persistence and integrations:</strong> <code>services/agent-orchestrator/tests/test_persistence.py</code> covers local records, events and receipts; optional integration suites use controlled boundaries.</li>
+<li><strong>Execution and service handoff:</strong> <code>services/control-plane/tests/execution.test.ts</code> covers admission, checks, cancellation, resumes and workspace leases. <code>tests/integration.test.mjs</code> exercises Python → Node → demo execution and verification over local HTTP.</li>
+<li><strong>Recorded evidence and limits:</strong> <code>docs/deep-agent-harness-implementation-summary.md</code> retains historical test/build results. Fixtures do not establish live model/Codex execution, private document/MCP authentication or full browser stability.</li>
+</ul>
+</main>
+</body>
+</html>
