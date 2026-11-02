@@ -1,0 +1,17 @@
+flowchart LR
+  W["Project watcher<br/>Detect changed Markdown"]
+  subgraph AWS["AWS · Document ingestion and storage"]
+    direction LR
+    C@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/SecurityIdentityCompliance/Cognito.png", label: "Amazon Cognito", pos: "b", h: 54, constraint: "on" }
+    G@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/NetworkingContentDelivery/APIGateway.png", label: "Amazon API Gateway", pos: "b", h: 54, constraint: "on" }
+    L@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/Compute/Lambda.png", label: "AWS Lambda · Telemetry API", pos: "b", h: 54, constraint: "on" }
+    S@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/Storage/SimpleStorageService.png", label: "Amazon S3 · Markdown content", pos: "b", h: 54, constraint: "on" }
+    D@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/Database/DynamoDB.png", label: "Amazon DynamoDB · Document index", pos: "b", h: 54, constraint: "on" }
+    C -. "JWT issuer / signing keys" .-> G
+    G -->|Invoke| L
+    L -->|Write Markdown object| S
+    L -->|Publish READY metadata| D
+  end
+  W -. "Private sign-in / refresh" .-> C
+  W -->|JWT + device-signed upload| G
+  L -. "Matching READY receipt via API" .-> W

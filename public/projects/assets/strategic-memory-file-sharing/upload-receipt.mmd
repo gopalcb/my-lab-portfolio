@@ -1,0 +1,19 @@
+sequenceDiagram
+  autonumber
+  participant W as Project watcher
+  participant G as API Gateway
+  participant L as Telemetry Lambda
+  participant S as Amazon S3
+  participant D as DynamoDB
+  Note over W: Stable Markdown snapshot + changed hash
+  W->>G: Upload with JWT + device signature
+  Note over G: Verify Cognito JWT
+  G->>L: Authenticated request
+  Note over L: Validate identity, signature and path
+  L->>S: Write Markdown bytes
+  S-->>L: Object write acknowledged
+  L->>D: Publish READY document index
+  D-->>L: Metadata write acknowledged
+  L-->>G: READY receipt + file ID + content hash
+  G-->>W: Upload result
+  Note over W: Mark complete only after matching receipt

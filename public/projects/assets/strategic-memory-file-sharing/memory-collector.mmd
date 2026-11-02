@@ -1,0 +1,11 @@
+flowchart LR
+  subgraph LOCAL["Local collector · independent worker"]
+    E["Completed task<br/>Summary + passed checks"] --> Q[("SQLite job queue")]
+    Q --> X["LangGraph worker<br/>Extract lessons"]
+    X --> V["Evidence gate<br/>Validate references and content"]
+    V --> R[("Local review candidates")]
+    R --> H["Human review<br/>Separate promotion decision"]
+  end
+  B@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/ArtificialIntelligence/Bedrock.png", label: "Amazon Bedrock · Qwen", pos: "b", h: 54, constraint: "on" }
+  X -->|Bounded task evidence| B
+  B -->|Structured model output| X
