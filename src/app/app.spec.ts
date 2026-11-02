@@ -270,7 +270,7 @@ describe('Portfolio API route integration', () => {
     harness.detectChanges();
     expect(TestBed.inject(Router).url).toBe('/projects');
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'Strategic Memory Collector Agents and a Serverless Markdown Sharing Network', page_path: '/projects' });
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'agent file sharing network: langchain mcp, oauth and aws', page_path: '/projects' });
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('sandbox')).not.toContain('allow-same-origin');
   });
 
