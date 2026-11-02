@@ -25,8 +25,9 @@ describe('Portfolio route state', () => {
     configure();
     const harness = await RouterTestingHarness.create();
     const page = await harness.navigateByUrl('/projects/agent-file-sharing-network-langchain-mcp-oauth-and-aws', PortfolioPage);
-    expect(page.state().selected?.title).toBe('agent file sharing network: langchain mcp, oauth and aws');
-    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('agent file sharing network: langchain mcp, oauth and aws');
+    expect(page.state().selected?.title).toBe('Strategic Memory Collector Agents and a Serverless Markdown Sharing Network');
+    expect(page.state().selected?.apiTitle).toBe('agent file sharing network: langchain mcp, oauth and aws');
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('Strategic Memory Collector Agents and a Serverless Markdown Sharing Network');
   });
 
   it('opens About through content delivery and profile links in separate tabs', async () => {
@@ -57,14 +58,14 @@ describe('Portfolio route state', () => {
     await harness.navigateByUrl('/projects', PortfolioPage);
     const links = [...harness.routeNativeElement!.querySelectorAll('.item-list a')];
     expect(links.map(link => link.textContent?.trim())).toEqual([
-      'agent file sharing network: langchain mcp, oauth and aws',
+      'Strategic Memory Collector Agents and a Serverless Markdown Sharing Network',
       'Hybrid Agent Harness with LangGraph, Deep Agents, and Codex',
       'OpenTelemetry implementation lab',
       'What Burning 436M Tokens Taught Me',
       'Customizing agents and runtime',
     ]);
     expect(links[0].getAttribute('href')).toContain('/projects/agent-file-sharing-network-langchain-mcp-oauth-and-aws');
-    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('agent file sharing network: langchain mcp, oauth and aws');
+    expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toBe('Strategic Memory Collector Agents and a Serverless Markdown Sharing Network');
     expect(harness.routeNativeElement!.querySelector('.site-nav')?.textContent).toContain('Projects');
     expect(harness.routeNativeElement!.querySelector('.site-nav a[href="/read"]')).toBeNull();
   });
@@ -269,7 +270,7 @@ describe('Portfolio API route integration', () => {
     harness.detectChanges();
     expect(TestBed.inject(Router).url).toBe('/projects');
     expect(fetch).toHaveBeenCalledTimes(1);
-    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'agent file sharing network: langchain mcp, oauth and aws', page_path: '/projects' });
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toMatchObject({ event_type: 'project_open', get_project: 'Strategic Memory Collector Agents and a Serverless Markdown Sharing Network', page_path: '/projects' });
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('sandbox')).not.toContain('allow-same-origin');
   });
 
