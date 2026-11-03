@@ -19,4 +19,5 @@ jobs:
       - run: npm test -- --watch=false
       - run: node scripts/verify-agents-runtime.mjs
       - run: node scripts/verify-observability.mjs
+      - run: node scripts/verify-contact.mjs
       - run: npm run build
