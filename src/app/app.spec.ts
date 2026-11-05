@@ -47,7 +47,7 @@ describe('Portfolio route state', () => {
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects', PortfolioPage);
     const links = [...harness.routeNativeElement!.querySelectorAll('.item-list a')];
-    expect(links).toHaveLength(5);
+    expect(links).toHaveLength(6);
     expect(links[0].textContent).toContain('Runtime Controller');
     expect(links[0].getAttribute('href')).toContain('/projects/visual-agent-builder');
     expect(harness.routeNativeElement!.querySelector('iframe')?.getAttribute('title')).toContain('Runtime Controller');
@@ -58,7 +58,7 @@ describe('Portfolio route state', () => {
     expect(harness.routeNativeElement!.querySelector('.site-nav a[href="#/read"]')).toBeNull();
   });
 
-  it.each(['deep-agent-harness-with-codex', 'agent-file-sharing-network-langchain-mcp-oauth-and-aws'])('opens restored project %s', async id => {
+  it.each(['deep-agent-harness-with-codex', 'agent-file-sharing-network-langchain-mcp-oauth-and-aws', 'api-builder-agent'])('opens restored project %s', async id => {
     configure();
     const harness = await RouterTestingHarness.create();
     const page = await harness.navigateByUrl(`/projects/${id}`, PortfolioPage);
@@ -80,7 +80,7 @@ describe('Portfolio route state', () => {
     configure();
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl('/projects/my-customized-agents-and-runtime', PortfolioPage);
-    expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(5);
+    expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(6);
     expect(harness.routeNativeElement!.querySelector('.item-list [aria-current]')?.textContent).toContain('Customizing agents and runtime');
     await harness.navigateByUrl('/read/kubernetes-networking', PortfolioPage);
     expect(harness.routeNativeElement!.querySelectorAll('.item-list a')).toHaveLength(9);
