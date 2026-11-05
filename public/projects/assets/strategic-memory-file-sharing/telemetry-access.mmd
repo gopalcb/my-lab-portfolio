@@ -1,0 +1,18 @@
+flowchart LR
+  U["User browser<br/>Telemetry Documents"]
+  subgraph AWS["AWS · UI delivery and document access"]
+    F@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/NetworkingContentDelivery/CloudFront.png", label: "Amazon CloudFront", pos: "b", h: 54, constraint: "on" }
+    UI@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/Storage/SimpleStorageService.png", label: "Amazon S3 · UI assets", pos: "b", h: 54, constraint: "on" }
+    C@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/SecurityIdentityCompliance/Cognito.png", label: "Amazon Cognito", pos: "b", h: 54, constraint: "on" }
+    G@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/NetworkingContentDelivery/APIGateway.png", label: "Amazon API Gateway", pos: "b", h: 54, constraint: "on" }
+    L@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/Compute/Lambda.png", label: "AWS Lambda · Telemetry API", pos: "b", h: 54, constraint: "on" }
+    D@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/Database/DynamoDB.png", label: "Amazon DynamoDB · Document list", pos: "b", h: 54, constraint: "on" }
+    S@{ img: "https://raw.githubusercontent.com/awslabs/aws-icons-for-plantuml/v20.0/dist/Storage/SimpleStorageService.png", label: "Amazon S3 · Markdown content", pos: "b", h: 54, constraint: "on" }
+    F -->|Serve Angular assets| UI
+    F -->|Forward API requests| G
+    G --> L
+    L -->|List / filter| D
+    L -->|Read / save Markdown| S
+  end
+  U -->|Open workspace / API requests| F
+  U -. "Sign in" .-> C

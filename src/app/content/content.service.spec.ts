@@ -20,7 +20,7 @@ describe('ContentService', () => {
 
   it('returns distinct local object catalogs without making list requests', () => {
     const { service } = setup();
-    service.list('projects').subscribe(items => expect(items).toHaveLength(6));
+    service.list('projects').subscribe(items => expect(items).toHaveLength(8));
     service.list('read').subscribe(items => expect(items).toHaveLength(9));
   });
 
